@@ -1,0 +1,89 @@
+# Dot Copy Paste
+
+작업명: Dot Copy Paste  
+버전: 0.1.0  
+공개 제품명과 상표 검토: 완료되지 않음
+
+이 확장프로그램은 OpenAI의 공식 제품이나 제휴 제품이 아닙니다.
+
+## 현재 상태
+
+로그인된 `/dots/home` 대화의 메시지 목록과 입력창 구조는 확인했고, 그 구조로 어댑터를 연결했습니다. 일반 ChatGPT 경로에는 버튼을 넣지 않습니다. 설치된 확장프로그램을 새 코드로 다시 불러오기 전에는 기존 페이지에 버튼이 나타나지 않습니다. 웹스토어 제출 준비가 끝난 상태는 아닙니다.
+
+## 경로
+
+- 프로젝트: `D:\1000_b_project\gpt_dot_copy`
+- 압축해제 설치 폴더: `D:\1000_b_project\gpt_dot_copy\extension`
+- 테스트용 ZIP: `D:\1000_b_project\gpt_dot_copy\dist\Dot-Copy-Paste-0.1.0-test.zip`
+
+처음 파일은 `D:\1000_b_project\Dot_Copy_Paste`에 작성한 뒤 이 폴더로 통합했습니다. 그 원본 폴더는 삭제하지 않았습니다.
+
+## Windows 명령 프롬프트
+
+```bat
+cd /d D:\1000_b_project\gpt_dot_copy
+npm install
+npm test
+scripts\package.cmd
+```
+
+개발에 사용한 도구는 Node.js v24.5.0, npm 11.5.1, Chrome 155.0.8059.84입니다. `npm install`은 테스트용 jsdom만 설치합니다. 확장프로그램 실행에는 Node.js가 필요 없습니다.
+
+## 수동 설치
+
+1. Chrome에서 `chrome://extensions`를 엽니다.
+2. 개발자 모드를 켭니다.
+3. 압축해제된 확장 프로그램을 로드합니다.
+4. `D:\1000_b_project\gpt_dot_copy\extension` 폴더를 선택합니다.
+5. 도구 모음에서 Dot Copy Paste 팝업을 열어 버전 0.1.0과 안내 문구를 확인합니다.
+
+이미 `D:\1000_b_project\Dot_Copy_Paste\extension`을 Chrome에 불러왔다면 그 항목을 제거하고 위 새 폴더를 다시 불러와야 합니다. 확장프로그램 ID와 클립보드 선택 권한이 그대로 유지된다고 보지 않습니다.
+
+브랜드 Chrome 155에서는 `--load-extension`이 제거되어 있습니다. 자동 로드 시도는 [TEST_REPORT.md](TEST_REPORT.md)에 적었습니다. 위의 수동 로드는 이 환경에서 클릭으로 완료하지 못했습니다.
+
+## 0.1.0에서 기대할 동작
+
+`chatgpt.com`의 `/dots/` 대화에서 메시지 목록과 입력창이 확인된 경우에만 복사 버튼과 붙여넣기 버튼을 넣습니다. 로그인 전 화면과 `/c/` 같은 일반 대화에는 넣지 않습니다.
+
+팝업에서는 다음만 할 수 있습니다.
+
+- 기능 켜기/끄기
+- 브라우저 언어, 한국어, 영어 중 선택
+- 버전 확인
+- 클립보드 읽기 권한의 목적 확인, 허용, 철회
+
+닷 대화 화면이 확인된 뒤에만 페이지에서 복사와 붙여넣기를 실행합니다.
+
+## 지원 범위
+
+- 대상은 Chrome의 닷 웹 화면으로 한정합니다.
+- ChatGPT 데스크톱 앱과 모바일 앱은 지원하지 않습니다.
+- 모바일 웹은 OpenAI 문서에서도 지원되지 않는다고 되어 있으며, 이 확장프로그램도 지원하지 않습니다.
+- 대화 전체 내보내기, 요약, 클립보드 기록, 계정, 결제, 서버, 분석 기능은 없습니다.
+- 붙여넣기는 입력까지만 하며 전송하지 않습니다. 빈 닷 입력창에서 프로그램이 넣은 텍스트는 Send를 활성화하지 못했고, 그 경우 텍스트를 되돌립니다. 브라우저 입력으로 넣은 시험 문자열은 Send를 활성화했으며, 전송하지 않고 지웠습니다.
+
+## 알려진 제한
+
+- 메시지 목록, 본문, 작성자 구분, 입력창 종류는 `/dots/home`에서 확인했습니다. 생성 중 표시, 대화 전환, 스크롤로 메시지가 바뀌는 방식은 확인하지 못했습니다. 자세한 내용은 [DOM_INVESTIGATION.md](DOM_INVESTIGATION.md)에 있습니다.
+- 닷 입력창은 `contenteditable`입니다. `textarea`에 값을 직접 넣는 경로의 `Ctrl+Z`는 이 화면에서 검증하지 못했습니다.
+- 프로그램 방식의 텍스트 입력은 닷 편집기의 Send 상태를 바꾸지 못했습니다. React 내부 상태는 사용하지 않습니다. 빈 입력창에서 Send가 계속 비활성이면 붙여넣기를 성공으로 표시하지 않고 되돌립니다.
+- 클립보드 쓰기 권한은 넣지 않았습니다. 복사는 사용자 클릭 중 `navigator.clipboard.writeText`와 `document.execCommand("copy")`를 사용합니다. 닷 페이지의 콘텐츠 스크립트에서 이 호출이 성공하는지는 검증하지 못했습니다.
+- 클립보드 읽기 권한 요청은 팝업 버튼에서만 합니다. 권한 창이 뜨면 그 클릭의 사용자 동작이 끊기므로, 허용한 뒤 페이지의 붙여넣기 버튼을 다시 눌러야 합니다. 이 흐름은 실제 Chrome 권한 창에서 검증하지 못했습니다.
+
+## 권한
+
+| 선언 | 종류 | 이유 |
+| --- | --- | --- |
+| `storage` | 필수 | 기능 켜기/끄기와 언어 설정만 이 브라우저에 저장합니다. |
+| `clipboardRead` | 선택 | 사용자가 팝업에서 허용한 경우에만 붙여넣기 클릭에서 일반 텍스트를 읽기 위해 사용합니다. |
+| `https://chatgpt.com/*` | 콘텐츠 스크립트 범위 | 버튼을 넣을 수 있는 사이트를 chatgpt.com으로 제한합니다. 설치 시 해당 사이트 데이터 접근 경고가 표시될 수 있습니다. |
+
+`clipboardWrite`, `tabs`, `history`, `cookies`, `webRequest`, `<all_urls>`는 선언하지 않습니다. 호스트 권한 키와 서비스 워커도 없습니다.
+
+## 문서
+
+- [DOM_INVESTIGATION.md](DOM_INVESTIGATION.md)
+- [TEST_REPORT.md](TEST_REPORT.md)
+- [PRIVACY_POLICY.md](PRIVACY_POLICY.md)
+- [STORE_LISTING_KO.md](STORE_LISTING_KO.md)
+- [STORE_LISTING_EN.md](STORE_LISTING_EN.md)

@@ -1,0 +1,89 @@
+:root {
+  color-scheme: light dark;
+  font: 14px/1.45 system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  min-width: 280px;
+  max-width: 360px;
+  background: #ffffff;
+  color: #0f172a;
+}
+
+main {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 1.05rem;
+}
+
+h2 {
+  font-size: 0.95rem;
+}
+
+.notice,
+.meta,
+.status {
+  color: #334155;
+  font-size: 0.85rem;
+}
+
+.row,
+.field,
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.field {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+button,
+select {
+  font: inherit;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: inherit;
+  padding: 6px 8px;
+}
+
+button:focus,
+select:focus,
+input:focus {
+  outline: 2px solid #0f766e;
+  outline-offset: 2px;
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #111827;
+    color: #f8fafc;
+  }
+
+  .notice,
+  .meta,
+  .status {
+    color: #cbd5e1;
+  }
+
+  button,
+  select {
+    background: #1f2937;
+    border-color: #4b5563;
+    color: #f8fafc;
+  }
+}

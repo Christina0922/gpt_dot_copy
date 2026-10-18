@@ -1,0 +1,5 @@
+node_modules/
+dist/
+chrome-smoke-profile/
+*.log
+.DS_Store

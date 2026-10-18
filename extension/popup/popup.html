@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dot Copy Paste</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <h1 data-i18n="popupTitle">Dot Copy Paste</h1>
+      <p data-i18n="popupIntro"></p>
+      <p class="notice" data-i18n="domUnverified"></p>
+      <label class="row">
+        <input data-setting="enabled" type="checkbox" />
+        <span data-i18n="enabledLabel"></span>
+      </label>
+      <label class="field">
+        <span data-i18n="languageLabel"></span>
+        <select data-setting="language">
+          <option value="auto">Browser language</option>
+          <option value="ko">Korean</option>
+          <option value="en">English</option>
+        </select>
+      </label>
+      <section>
+        <h2 data-i18n="clipboardHeading"></h2>
+        <p data-i18n="clipboardExplain"></p>
+        <div class="actions">
+          <button type="button" data-action="allow-clipboard"></button>
+          <button type="button" data-action="revoke-clipboard"></button>
+        </div>
+        <p class="status" data-role="permission-status" role="status" aria-live="polite"></p>
+      </section>
+      <p class="meta"><span data-i18n="versionLabel"></span> <span data-role="version"></span></p>
+      <p class="meta" data-i18n="unofficial"></p>
+      <p class="meta" data-i18n="trademark"></p>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

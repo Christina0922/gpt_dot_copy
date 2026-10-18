@@ -1,0 +1,68 @@
+/**
+ * Live ChatGPT Dot adapter.
+ *
+ * Confirmed on 2026-10-19 in the signed-in Dot conversation at /dots/home.
+ * Message text and account details were not recorded.
+ */
+
+function authorKind(message) {
+  const actions = [...message.querySelectorAll("[data-action]")].map((node) => node.getAttribute("data-action"));
+  if (actions.includes("open-image")) return "unknown";
+  const replyIndex = actions.indexOf("reply");
+  const reactionIndex = actions.indexOf("toggle-reaction-picker");
+  if (replyIndex === -1 || reactionIndex === -1) return "unknown";
+  return replyIndex < reactionIndex ? "user" : "dot";
+}
+
+export function detectDotScreen(doc) {
+  const host = doc?.location?.hostname || "";
+  if (host !== "chatgpt.com") return { active: false, reason: "not-chatgpt-host" };
+  const path = doc?.location?.pathname || "";
+  if (!path.startsWith("/dots/")) return { active: false, reason: "not-dot-path" };
+  if (typeof doc.querySelector !== "function") return { active: false, reason: "dot-landmarks-missing" };
+  const root = doc.querySelector("[data-role='messages-scroll']");
+  const composer = doc.querySelector("[data-role='composer'] [contenteditable='true'][role='textbox']");
+  if (!root || !composer) return { active: false, reason: "dot-landmarks-missing" };
+  return { active: true, reason: "dot-conversation" };
+}
+
+export const liveAdapter = {
+  detect: detectDotScreen,
+  getObserverRoot(doc) {
+    if (typeof doc?.querySelector !== "function") return null;
+    return doc.querySelector("[data-role='messages-scroll']");
+  },
+  messagesIn(node) {
+    if (!node || node.nodeType !== 1 || typeof node.querySelectorAll !== "function") return [];
+    const found = [];
+    if (node.matches?.("article[data-message-id]")) found.push(node);
+    found.push(...node.querySelectorAll("article[data-message-id]"));
+    return found;
+  },
+  messageFromNode(node) {
+    const element = node?.nodeType === 1 ? node : node?.parentElement;
+    return element?.closest?.("article[data-message-id]") || null;
+  },
+  getBodyElement(message) {
+    if (!message || typeof message.querySelector !== "function") return null;
+    return message.querySelector("[data-markdown-text-style]");
+  },
+  getGenerationState(message) {
+    if (!message) return "unknown";
+    return authorKind(message) === "user" ? "complete" : "unknown";
+  },
+  hasNativeCopy() {
+    return false;
+  },
+  getComposer(doc) {
+    if (typeof doc?.querySelector !== "function") return null;
+    const element = doc.querySelector("[data-role='composer'] [contenteditable='true'][role='textbox']");
+    if (!element) return null;
+    return { kind: "contenteditable", element };
+  },
+  composerHasDraft(element) {
+    const send = element?.closest?.("[data-role='composer']")?.querySelector?.("button[aria-label='Send']");
+    if (!send) return null;
+    return send.disabled !== true && send.getAttribute("aria-disabled") !== "true";
+  }
+};
