@@ -15,6 +15,19 @@ function removeStaleUi(doc) {
   doc.querySelectorAll("[data-dcp-ui]").forEach((node) => node.remove());
 }
 
+// The same error this many times within the window stops observing; anything less only skips that node.
+const ERROR_REPEAT_LIMIT = 5;
+const ERROR_REPEAT_WINDOW_MS = 2000;
+// Refreshes that keep moving our own UI this often look like a fight with the page, so observing pauses.
+const LOOP_LIMIT = 120;
+const LOOP_WINDOW_MS = 2000;
+const LOOP_PAUSE_MS = 2000;
+
+function clip(value, max) {
+  const text = String(value ?? "");
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
 export function createController({
   adapter,
   document: doc,
@@ -39,7 +52,60 @@ export function createController({
   let scanCount = 0;
   let queued = false;
   let queue = [];
+  let halted = false;
+  let uiWrites = 0;
+  let loopTimes = [];
+  let pauseTimer = null;
+  const failures = new Map();
   const cleanups = [];
+
+  function now() {
+    return typeof view.performance?.now === "function" ? view.performance.now() : Date.now();
+  }
+
+  // Describes where a failure happened by tag and ids only; message text never goes into the log.
+  function describeNode(node) {
+    const element = node?.nodeType === 1 ? node : node?.parentElement;
+    if (!element) return null;
+    let message = null;
+    try {
+      message = adapter.messageFromNode(element);
+    } catch {
+      message = null;
+    }
+    return {
+      tag: String(element.tagName || "").toLowerCase(),
+      role: element.getAttribute?.("data-role") || null,
+      inMessage: Boolean(message),
+      messageId: message ? clip(message.getAttribute?.("data-message-id") || "", 64) || null : null,
+      isMessage: Boolean(message && message === element)
+    };
+  }
+
+  function reportFailure(stage, error, node) {
+    const name = clip(error?.name || "Error", 40);
+    const message = clip(error?.message, 300);
+    console.error("[Dot Copy Paste]", stage, { name, message, stack: clip(error?.stack, 2000), node: describeNode(node) });
+    const key = `${stage}|${name}|${message}`;
+    const time = now();
+    const recent = (failures.get(key) || []).filter((at) => time - at < ERROR_REPEAT_WINDOW_MS);
+    recent.push(time);
+    failures.set(key, recent);
+    if (recent.length >= ERROR_REPEAT_LIMIT && !halted) {
+      halted = true;
+      disconnectObservers();
+      console.error("[Dot Copy Paste]", "stopped", { reason: "repeated-error", stage, name, count: recent.length, windowMs: ERROR_REPEAT_WINDOW_MS });
+    }
+  }
+
+  function guard(stage, node, work) {
+    try {
+      return work();
+    } catch (error) {
+      reportFailure(stage, error, node);
+      return undefined;
+    }
+  }
 
   function t(key) {
     return createTranslator(getLanguage())(key);
@@ -103,28 +169,38 @@ export function createController({
     if (!place?.anchor?.isConnected) return;
     wrap.dataset.dcpPlacement = place.mode === "below" ? "below" : "inline";
     if (place.mode === "below") {
-      if (place.anchor.nextElementSibling !== wrap) place.anchor.insertAdjacentElement("afterend", wrap);
+      if (place.anchor.nextElementSibling !== wrap) {
+        place.anchor.insertAdjacentElement("afterend", wrap);
+        uiWrites += 1;
+      }
       return;
     }
-    if (wrap.parentElement !== place.anchor || place.anchor.lastElementChild !== wrap) place.anchor.append(wrap);
+    if (wrap.parentElement !== place.anchor || place.anchor.lastElementChild !== wrap) {
+      place.anchor.append(wrap);
+      uiWrites += 1;
+    }
   }
 
   function updatePositions() {
     for (const [message, ui] of copyUi) {
-      if (!message.isConnected) {
-        ui.wrap.remove();
-        copyUi.delete(message);
-        continue;
+      guard("position", message, () => {
+        if (!message.isConnected) {
+          ui.wrap.remove();
+          copyUi.delete(message);
+          return;
+        }
+        const body = adapter.getBodyElement(message);
+        if (body) placeCopySlot(ui.wrap, body);
+      });
+    }
+    guard("paste-position", null, () => {
+      const composer = adapter.getComposer(doc);
+      if (pasteUi && composer?.element?.isConnected) place(pasteUi.wrap, composer.element, "above");
+      if (pasteUi && !composer?.element?.isConnected) {
+        pasteUi.wrap.remove();
+        pasteUi = null;
       }
-      const body = adapter.getBodyElement(message);
-      if (body) placeCopySlot(ui.wrap, body);
-    }
-    const composer = adapter.getComposer(doc);
-    if (pasteUi && composer?.element?.isConnected) place(pasteUi.wrap, composer.element, "above");
-    if (pasteUi && !composer?.element?.isConnected) {
-      pasteUi.wrap.remove();
-      pasteUi = null;
-    }
+    });
   }
 
   function currentFormat() {
@@ -287,6 +363,7 @@ export function createController({
       if (existing) {
         existing.wrap.remove();
         copyUi.delete(message);
+        uiWrites += 1;
       }
       return;
     }
@@ -377,20 +454,37 @@ export function createController({
     pasteUi.button.setAttribute("aria-label", t("paste"));
   }
 
+  // A failure on one node skips only that node; see reportFailure for when observing stops.
   function refreshNodes(nodes) {
     scanCount += 1;
-    if (scanCount > 40) throw new Error("observer loop");
+    const writesBefore = uiWrites;
     const seen = new Set();
     for (const node of nodes) {
-      const element = relevantElement(node);
-      if (!element) continue;
-      const host = adapter.messageFromNode(element);
-      if (host) seen.add(host);
-      for (const message of adapter.messagesIn(element)) seen.add(message);
+      guard("scan", node, () => {
+        const element = relevantElement(node);
+        if (!element) return;
+        const host = adapter.messageFromNode(element);
+        if (host) seen.add(host);
+        for (const message of adapter.messagesIn(element)) seen.add(message);
+      });
     }
-    for (const message of seen) syncCopyButton(message);
-    syncPasteButton();
+    for (const message of seen) guard("copy-button", message, () => syncCopyButton(message));
+    guard("paste-button", null, () => syncPasteButton());
     updatePositions();
+    return uiWrites !== writesBefore;
+  }
+
+  function pauseForLoop() {
+    disconnectObservers();
+    console.error("[Dot Copy Paste]", "paused", { reason: "observer-loop", refreshes: loopTimes.length, windowMs: LOOP_WINDOW_MS, pauseMs: LOOP_PAUSE_MS });
+    loopTimes = [];
+    pauseTimer = view.setTimeout(() => {
+      pauseTimer = null;
+      if (stopped || halted) return;
+      connectObserver();
+      const root = adapter.getObserverRoot(doc);
+      if (root) queueRefresh([root]);
+    }, LOOP_PAUSE_MS);
   }
 
   function queueRefresh(nodes) {
@@ -403,13 +497,13 @@ export function createController({
       const batch = queue;
       queue = [];
       queued = false;
-      try {
-        refreshNodes(batch);
-      } catch (error) {
-        disconnectObservers();
-        const name = error && error.message === "observer loop" ? "observer-loop" : error?.name || "Error";
-        console.error("[Dot Copy Paste]", name);
-      }
+      if (stopped || halted || pauseTimer) return;
+      const wrote = guard("refresh", null, () => refreshNodes(batch));
+      if (!wrote) return;
+      const time = now();
+      loopTimes = loopTimes.filter((at) => time - at < LOOP_WINDOW_MS);
+      loopTimes.push(time);
+      if (loopTimes.length > LOOP_LIMIT) pauseForLoop();
     });
   }
 
@@ -487,6 +581,11 @@ export function createController({
     savedCaret = null;
     queue = [];
     queued = false;
+    halted = false;
+    failures.clear();
+    loopTimes = [];
+    if (pauseTimer) view.clearTimeout(pauseTimer);
+    pauseTimer = null;
     removeStaleUi(doc);
     scanCount = 0;
   }
