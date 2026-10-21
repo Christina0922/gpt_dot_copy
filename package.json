@@ -1,6 +1,6 @@
 {
   "name": "dot-copy-paste",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Test build of an independent Chrome extension that adds copy and paste buttons to a confirmed ChatGPT Dot conversation.",

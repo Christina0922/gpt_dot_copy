@@ -45,3 +45,23 @@ test("keeps ordered list numbers and inline spacing", () => {
   `);
   assert.equal(extractPlainText(window.document.getElementById("body")), "3. 셋째\n4. 넷째\n\n값 a  b 입니다");
 });
+
+test("keeps code whitespace exactly: blank line runs, first-line indent, trailing spaces", () => {
+  const { window } = loadDom(`<div id="body"><pre><code>    first\n\n\n\nlast&#32;&#32;\n</code></pre></div>`);
+  assert.equal(extractPlainText(window.document.getElementById("body")), "    first\n\n\n\nlast  ");
+});
+
+test("indents nested lists, keeps list paragraphs on the marker line, and separates table cells", () => {
+  const { window } = loadDom(`
+    <div id="body">
+      <ul><li><p>A</p><ul><li>A1<ol><li>x</li></ol></li></ul></li><li>B</li></ul>
+      <table><tr><th>이름</th><th>값</th></tr><tr><td>a</td><td>1</td></tr></table>
+    </div>
+  `);
+  assert.equal(extractPlainText(window.document.getElementById("body")), "- A\n  - A1\n    1. x\n- B\n\n이름\t값\na\t1");
+});
+
+test("keeps the space between neighboring inline elements", () => {
+  const { window } = loadDom(`<div id="body"><p><strong>굵게</strong> <em>기울임</em></p></div>`);
+  assert.equal(extractPlainText(window.document.getElementById("body")), "굵게 기울임");
+});

@@ -1,16 +1,23 @@
 # Chrome Web Store listing draft (English)
 
-Status: not ready to submit. This is a draft only.  
-Version: 0.1.0  
-Public name and trademark review: not complete
+Status: local draft, superseded by the live Chrome Web Store listing.  
+Live listing (0.1.0, updated 19 October 2026): https://chromewebstore.google.com/detail/dot-copy-paste/ndpennnmcicncopijfkmplbmkndkcdej  
+The live overview starts with “Test build. Buttons stay hidden until a ChatGPT Dot chat page is verified.” That store text is the public listing. Do not treat the paragraphs below as the current store copy.  
+Version: 0.2.0
 
 This extension is not an official OpenAI product and is not affiliated with OpenAI. No user counts, performance claims, or partnership claims are included because none were verified.
 
 ## Listing text limited to the verified scope
 
-Dot Copy Paste 0.1.0 is an independently developed Chrome test build. The Dot conversation screen has not been verified, so this version does not show copy or paste buttons on that screen.
+Dot Copy Paste 0.2.0 is an independently developed Chrome test build. The Dot conversation screen has not been verified, so this version does not show copy or paste buttons on that screen.
 
-The popup can turn the feature on or off, choose the language, and show the version. Clipboard reading is an optional permission and is requested only after the popup explains its purpose.
+The popup can turn the feature on or off, choose the language, set the default copy format (text or Markdown), and show the version. Clipboard reading is an optional permission and is requested only after the popup explains its purpose.
+
+## Permission justifications (for the submission form)
+
+- `storage`: Stores only the on/off switch, display language, and default copy format (text or Markdown) in this browser. Conversation content is never stored.
+- `clipboardRead` (optional): Optional. Only if you allow it, the clipboard's plain text is read once, at the moment you click Paste, and placed in the Dot input field. Copy keeps working if you decline or revoke it.
+- chatgpt.com site access: Limits the buttons to chatgpt.com. They run only after a Dot conversation screen is confirmed, and no data is sent anywhere.
 
 ## Claims that must not be used yet
 
@@ -31,4 +38,4 @@ The popup can turn the feature on or off, choose the language, and show the vers
 
 The test ZIP is not a submission build:
 
-`D:\1000_b_project\gpt_dot_copy\dist\Dot-Copy-Paste-0.1.0-test.zip`
+`D:\1000_b_project\gpt_dot_copy\dist\Dot-Copy-Paste-0.2.0-test.zip`

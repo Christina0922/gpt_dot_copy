@@ -9,7 +9,7 @@ const root = new URL("../extension/", import.meta.url);
 test("manifest is MV3 and limited to chatgpt.com", () => {
   const manifest = JSON.parse(readFileSync(new URL("manifest.json", root), "utf8"));
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, "0.1.0");
+  assert.equal(manifest.version, "0.2.0");
   assert.deepEqual(manifest.permissions, ["storage"]);
   assert.deepEqual(manifest.optional_permissions, ["clipboardRead"]);
   assert.equal(manifest.host_permissions, undefined);
@@ -17,7 +17,12 @@ test("manifest is MV3 and limited to chatgpt.com", () => {
   assert.deepEqual(manifest.content_scripts[0].js, ["content/content.js"]);
   assert.equal(manifest.content_scripts[0].type, undefined);
   assert.equal(JSON.stringify(manifest).includes("<all_urls>"), false);
-  for (const forbidden of ["tabs", "history", "cookies", "webRequest", "clipboardWrite"]) {
+  assert.equal(manifest.optional_host_permissions, undefined);
+  assert.equal(manifest.background, undefined);
+  assert.equal(manifest.web_accessible_resources, undefined);
+  assert.equal(manifest.content_scripts.length, 1);
+  assert.equal(manifest.content_scripts[0].all_frames, undefined);
+  for (const forbidden of ["tabs", "history", "cookies", "webRequest", "clipboardWrite", "scripting", "activeTab"]) {
     assert.equal(manifest.permissions.includes(forbidden), false);
     assert.equal((manifest.optional_permissions || []).includes(forbidden), false);
   }
@@ -41,6 +46,7 @@ test("extension source does not send or render user text unsafely", () => {
     "src/clipboard.js",
     "src/controller.js",
     "src/extract-text.js",
+    "src/extract-markdown.js",
     "src/insert-text.js",
     "src/live-adapter.js",
     "src/popup-controller.js"

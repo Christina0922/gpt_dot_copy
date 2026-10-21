@@ -1,6 +1,6 @@
 import { createController } from "./controller.js";
 import { liveAdapter } from "./live-adapter.js";
-import { loadSettings } from "./settings.js";
+import { loadSettings, normalizeSettings, saveSettings } from "./settings.js";
 import { resolveLanguage } from "./i18n.js";
 
 export function startApp({
@@ -11,7 +11,16 @@ export function startApp({
   clipboard = view.navigator.clipboard
 }) {
   let controller = null;
-  let settings = { enabled: true, language: "auto" };
+  let settings = normalizeSettings(null);
+
+  function setCopyFormat(copyFormat) {
+    settings = { ...settings, copyFormat };
+    const storage = chrome.storage?.local;
+    if (!storage || typeof storage.set !== "function") return;
+    saveSettings(storage, settings).catch((error) => {
+      console.error("[Dot Copy Paste]", error?.name || "Error");
+    });
+  }
 
   async function restart() {
     stopWatching();
@@ -29,7 +38,9 @@ export function startApp({
       document: doc,
       window: view,
       clipboard,
-      getLanguage: () => resolveLanguage(settings.language, uiLanguage)
+      getLanguage: () => resolveLanguage(settings.language, uiLanguage),
+      getCopyFormat: () => settings.copyFormat,
+      setCopyFormat
     });
     const result = controller.start();
     if (!result.active && result.reason === "dot-landmarks-missing") watchForDotLandmarks();
@@ -67,7 +78,15 @@ export function startApp({
   }
 
   chrome.storage?.onChanged.addListener((changes, area) => {
-    if (area === "local" && changes.settings) restart();
+    if (area !== "local" || !changes.settings) return;
+    const next = normalizeSettings(changes.settings.newValue);
+    // A format change alone only relabels the buttons, so a "Copied" status is not wiped by a restart.
+    if (controller && next.enabled === settings.enabled && next.language === settings.language) {
+      settings = next;
+      controller.refreshCopyLabels();
+      return;
+    }
+    restart();
   });
 
   if (view.navigation && typeof view.navigation.addEventListener === "function") {

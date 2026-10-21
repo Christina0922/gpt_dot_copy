@@ -1,4 +1,5 @@
 import { extractPlainText, hasCopyableText } from "./extract-text.js";
+import { extractMarkdown } from "./extract-markdown.js";
 import { insertPlainText, isEditorEmpty, readContentEditableCaret, readTextareaCaret } from "./insert-text.js";
 import { readPlainText, writePlainText } from "./clipboard.js";
 import { computeAnchorPosition, findCopyAnchor } from "./position.js";
@@ -20,6 +21,8 @@ export function createController({
   window: view,
   clipboard,
   getLanguage,
+  getCopyFormat = () => "text",
+  setCopyFormat = () => {},
   schedule = (callback) => {
     const raf = view.requestAnimationFrame;
     if (typeof raf === "function") raf.call(view, () => callback());
@@ -28,6 +31,7 @@ export function createController({
 }) {
   const copyUi = new Map();
   let pasteUi = null;
+  let openMenuUi = null;
   let savedCaret = null;
   let observer = null;
   let parentObserver = null;
@@ -123,34 +127,157 @@ export function createController({
     }
   }
 
-  function applyCopyLabel(button, state) {
+  function currentFormat() {
+    return getCopyFormat() === "markdown" ? "markdown" : "text";
+  }
+
+  function applyCopyLabel(ui, state) {
+    const { button, toggle, items } = ui;
+    const markdown = currentFormat() === "markdown";
+    toggle.textContent = "▾";
+    toggle.setAttribute("aria-label", t("copyFormatMenu"));
+    toggle.title = t("copyFormatMenu");
+    for (const item of items) {
+      item.textContent = t(item.dataset.dcpFormat === "markdown" ? "copyAsMarkdown" : "copyAsText");
+      item.setAttribute("aria-checked", String(item.dataset.dcpFormat === currentFormat()));
+    }
     if (state === "generating") {
       button.disabled = true;
-      button.textContent = t("copy");
+      toggle.disabled = true;
+      button.textContent = t(markdown ? "copyMarkdown" : "copy");
       button.setAttribute("aria-label", t("copyBusy"));
+      if (openMenuUi === ui) closeMenu(ui, false);
       return;
     }
     button.disabled = false;
-    if (state === "unknown") {
-      button.textContent = t("copyShown");
-      button.setAttribute("aria-label", t("copyShown"));
-      return;
-    }
-    button.textContent = t("copy");
-    button.setAttribute("aria-label", t("copy"));
+    toggle.disabled = false;
+    const key = state === "unknown" ? (markdown ? "copyShownMarkdown" : "copyShown") : (markdown ? "copyMarkdown" : "copy");
+    button.textContent = t(key);
+    button.setAttribute("aria-label", t(key));
   }
 
-  async function onCopy(message, status) {
+  function refreshCopyLabels() {
+    for (const [message, ui] of copyUi) applyCopyLabel(ui, adapter.getGenerationState(message));
+  }
+
+  async function onCopy(message, status, format) {
     const state = adapter.getGenerationState(message);
     if (state === "generating") return;
     const body = adapter.getBodyElement(message);
-    const text = body ? extractPlainText(body) : "";
+    const text = body ? (format === "markdown" ? extractMarkdown(body) : extractPlainText(body)) : "";
     if (!text) {
       setStatus(status, t("copyFailed"), "error");
       return;
     }
     const result = await writePlainText(text, clipboard, doc);
     setStatus(status, result.ok ? t("copied") : t("copyFailed"), result.ok ? "success" : "error");
+  }
+
+  function openMenu(ui) {
+    if (openMenuUi && openMenuUi !== ui) closeMenu(openMenuUi, false);
+    openMenuUi = ui;
+    ui.menu.hidden = false;
+    ui.toggle.setAttribute("aria-expanded", "true");
+    const checked = ui.items.find((item) => item.dataset.dcpFormat === currentFormat()) || ui.items[0];
+    checked.focus();
+  }
+
+  function closeMenu(ui, returnFocus) {
+    ui.menu.hidden = true;
+    ui.toggle.setAttribute("aria-expanded", "false");
+    if (openMenuUi === ui) openMenuUi = null;
+    if (returnFocus) ui.toggle.focus();
+  }
+
+  function onMenuKey(ui, event) {
+    const index = ui.items.indexOf(doc.activeElement);
+    const move = { ArrowDown: 1, ArrowUp: -1 }[event.key];
+    if (move) {
+      event.preventDefault();
+      ui.items[(index + move + ui.items.length) % ui.items.length].focus();
+      return;
+    }
+    if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      ui.items[event.key === "Home" ? 0 : ui.items.length - 1].focus();
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      closeMenu(ui, true);
+      return;
+    }
+    if (event.key === "Tab") closeMenu(ui, false);
+  }
+
+  function createCopyUi(message) {
+    const wrap = doc.createElement("span");
+    wrap.setAttribute("data-dcp-ui", "");
+    wrap.className = "dcp-copy-slot";
+    const split = doc.createElement("span");
+    split.className = "dcp-split";
+    const button = doc.createElement("button");
+    button.type = "button";
+    button.className = "dcp-btn dcp-btn-main";
+    button.setAttribute("data-dcp-copy", "");
+    const toggle = doc.createElement("button");
+    toggle.type = "button";
+    toggle.className = "dcp-btn dcp-btn-toggle";
+    toggle.setAttribute("data-dcp-copy-menu", "");
+    toggle.setAttribute("aria-haspopup", "menu");
+    toggle.setAttribute("aria-expanded", "false");
+    const menu = doc.createElement("span");
+    menu.className = "dcp-menu";
+    menu.setAttribute("role", "menu");
+    menu.hidden = true;
+    const items = ["text", "markdown"].map((format) => {
+      const item = doc.createElement("button");
+      item.type = "button";
+      item.className = "dcp-menu-item";
+      item.setAttribute("role", "menuitemradio");
+      item.dataset.dcpFormat = format;
+      menu.append(item);
+      return item;
+    });
+    const status = doc.createElement("span");
+    status.setAttribute("data-dcp-ui", "");
+    status.className = "dcp-status";
+    status.setAttribute("role", "status");
+    status.setAttribute("aria-live", "polite");
+    split.append(button, toggle);
+    wrap.append(split, menu, status);
+    const ui = { wrap, button, toggle, menu, items, status };
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onCopy(message, status, currentFormat());
+    });
+    toggle.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (openMenuUi === ui) closeMenu(ui, true);
+      else openMenu(ui);
+    });
+    toggle.addEventListener("keydown", (event) => {
+      if (event.key !== "ArrowDown" || openMenuUi === ui) return;
+      event.preventDefault();
+      openMenu(ui);
+    });
+    menu.addEventListener("keydown", (event) => onMenuKey(ui, event));
+    for (const item of items) {
+      item.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const format = item.dataset.dcpFormat;
+        closeMenu(ui, true);
+        // Copy first so the clipboard write stays inside this click.
+        onCopy(message, status, format);
+        setCopyFormat(format);
+        refreshCopyLabels();
+      });
+    }
+    return ui;
   }
 
   function syncCopyButton(message) {
@@ -165,30 +292,12 @@ export function createController({
     }
     let ui = copyUi.get(message);
     if (!ui) {
-      const wrap = doc.createElement("span");
-      wrap.setAttribute("data-dcp-ui", "");
-      wrap.className = "dcp-copy-slot";
-      const button = doc.createElement("button");
-      button.type = "button";
-      button.className = "dcp-btn";
-      button.setAttribute("data-dcp-copy", "");
-      const status = doc.createElement("span");
-      status.setAttribute("data-dcp-ui", "");
-      status.className = "dcp-status";
-      status.setAttribute("role", "status");
-      status.setAttribute("aria-live", "polite");
-      wrap.append(button, status);
-      button.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        onCopy(message, status);
-      });
-      ui = { wrap, button, status };
+      ui = createCopyUi(message);
       copyUi.set(message, ui);
     }
     const body = adapter.getBodyElement(message);
     if (body) placeCopySlot(ui.wrap, body);
-    applyCopyLabel(ui.button, adapter.getGenerationState(message));
+    applyCopyLabel(ui, adapter.getGenerationState(message));
   }
 
   async function onPaste(status) {
@@ -358,6 +467,9 @@ export function createController({
     on(doc, "selectionchange", rememberCaret, true);
     on(doc, "keyup", rememberCaret, true);
     on(doc, "mouseup", rememberCaret, true);
+    on(doc, "pointerdown", (event) => {
+      if (openMenuUi && !openMenuUi.wrap.contains(event.target)) closeMenu(openMenuUi, false);
+    }, true);
     on(doc, "scroll", () => updatePositions(), { capture: true, passive: true });
     on(view, "resize", () => updatePositions());
     return { active: true, reason: detection.reason };
@@ -371,6 +483,7 @@ export function createController({
     copyUi.clear();
     pasteUi?.wrap.remove();
     pasteUi = null;
+    openMenuUi = null;
     savedCaret = null;
     queue = [];
     queued = false;
@@ -381,6 +494,7 @@ export function createController({
   return {
     start,
     stop,
+    refreshCopyLabels,
     get scanCount() {
       return scanCount;
     },

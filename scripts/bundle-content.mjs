@@ -8,6 +8,7 @@ const order = [
   "src/i18n.js",
   "src/position.js",
   "src/extract-text.js",
+  "src/extract-markdown.js",
   "src/insert-text.js",
   "src/clipboard.js",
   "src/live-adapter.js",

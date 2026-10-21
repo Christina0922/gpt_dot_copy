@@ -1,6 +1,7 @@
 export const DEFAULT_SETTINGS = {
   enabled: true,
-  language: "auto"
+  language: "auto",
+  copyFormat: "text"
 };
 
 export function normalizeSettings(value) {
@@ -8,7 +9,8 @@ export function normalizeSettings(value) {
   const language = source.language === "ko" || source.language === "en" ? source.language : "auto";
   return {
     enabled: source.enabled !== false,
-    language
+    language,
+    copyFormat: source.copyFormat === "markdown" ? "markdown" : "text"
   };
 }
 

@@ -1,40 +1,39 @@
-# 개인정보처리방침 초안
+# Dot Copy Paste privacy policy
 
-대상: Dot Copy Paste 0.1.0  
-상태: 초안. 공개 URL은 없습니다.  
-개발 주체: 독립 개발. OpenAI의 공식 제품이나 제휴 제품이 아닙니다.  
-공개 제품명과 상표 검토: 완료되지 않음
+대상: Dot Copy Paste 0.2.0  
+상태: GitHub에 공개된 문서. Chrome Web Store 등록정보와 로컬 구현을 대조한 수정안.  
+개발 주체: 독립 개발. OpenAI의 공식 제품이나 제휴 제품이 아닙니다.
+
+이전 초안의 “닷 대화 구조를 확인하지 못해 버튼을 만들지 않는다”는 문장은 현재 스토어 설명 및 `extension/src/live-adapter.js`와 맞지 않아 아래 내용으로 대체합니다.
 
 ## 이 버전이 실제로 하는 일
 
-확장프로그램의 콘텐츠 스크립트는 `https://chatgpt.com/*`에 주입되도록 선언되어 있습니다. 버전 0.1.0의 화면 어댑터는 닷 대화 구조를 확인하지 못했기 때문에 버튼을 만들지 않고, 메시지 본문을 읽지 않습니다.
+콘텐츠 스크립트는 `https://chatgpt.com/*`에 선언되어 있습니다. 복사·붙여넣기 버튼은 ChatGPT 닷 대화 화면이 확인된 뒤에만 넣습니다. 로그인 전 화면과 `/c/` 같은 일반 대화에는 넣지 않습니다.
 
-팝업은 기능 사용 여부와 언어 설정만 이 브라우저의 `chrome.storage.local`에 저장합니다. 대화 내용, 클립보드 내용, 계정 정보는 저장하지 않습니다.
+Chrome Web Store 개요의 첫 문장은 “Test build. Buttons stay hidden until a ChatGPT Dot chat page is verified.”입니다.
 
-## 이후 화면이 확인되어 버튼이 생길 때의 처리
+사용자가 복사 버튼을 누르기 전에는 해당 메시지 본문을 읽지 않습니다. 버튼을 실행하면 화면에 보이는 해당 메시지 본문만 읽어, 사용자가 고른 형식(일반 텍스트 또는 마크다운)으로 클립보드에 넣습니다.
 
-복사 버튼을 누르기 전에는 해당 메시지 본문을 읽지 않습니다. 사용자가 복사 버튼을 누르거나 키보드로 그 버튼을 실행하면, 그때 화면에 보이는 해당 메시지 본문만 일반 텍스트로 읽어 클립보드에 넣습니다.
+붙여넣기는 스토어 설명과 구현 모두 시험 기능입니다. 버튼을 누르기 전에는 클립보드를 읽지 않습니다. 닷 입력창이 초안을 받지 못하면 삽입을 되돌리고 실패로 표시합니다. 메시지를 자동 전송하지 않습니다.
 
-붙여넣기 버튼을 누르기 전에는 클립보드를 읽지 않습니다. 페이지를 열 때 읽거나, 주기적으로 감시하거나, 자동으로 읽지 않습니다. 읽는 값은 일반 텍스트이며 HTML은 입력창에 넣지 않습니다.
+기능 사용 여부, 언어, 기본 복사 형식만 이 브라우저의 `chrome.storage.local`에 저장합니다. 대화 내용, 클립보드 내용, 계정 정보는 저장하지 않습니다.
 
-읽은 대화 본문과 클립보드 텍스트는 메모리에서 버튼 동작을 처리하는 동안만 사용합니다. 확장프로그램 저장소, 파일, 외부 서버로 보내지 않습니다.
+읽은 대화 본문과 클립보드 텍스트는 버튼 동작을 처리하는 동안만 메모리에서 사용합니다. 확장프로그램 저장소, 파일, 외부 서버로 보내지 않습니다.
 
 ## 권한
 
-- `storage`: 켜짐/꺼짐과 언어 설정
-- `clipboardRead`: 선택 권한. 팝업에서 목적을 보여 준 뒤 사용자가 허용한 경우에만 사용합니다. 거절하거나 철회해도 복사 기능의 코드 경로는 유지됩니다. 실제 닷 화면의 복사 동작은 아직 검증되지 않았습니다.
-- chatgpt.com 콘텐츠 스크립트: 버튼을 넣을 페이지를 이 사이트로 제한하기 위한 선언입니다.
+- `storage`: 켜짐/꺼짐, 언어, 기본 복사 형식 설정
+- `clipboardRead`: 선택 권한. 팝업에서 목적을 보여 준 뒤 사용자가 허용한 경우에만 붙여넣기에서 사용합니다.
+- chatgpt.com 콘텐츠 스크립트: 버튼을 넣을 페이지를 이 사이트로 제한합니다.
 
-분석, 광고, 추적 도구는 없습니다. 원격 코드와 CDN 스크립트는 사용하지 않습니다. 사용자 텍스트를 `innerHTML`로 넣지 않습니다.
+분석, 광고, 추적 도구는 없습니다. 원격 코드와 CDN 스크립트는 사용하지 않습니다.
 
-## 오류 기록
+## 연락
 
-예상된 실패는 페이지의 상태 문구로만 알립니다. 예외 이름 외의 본문이나 클립보드 내용을 콘솔에 남기지 않도록 작성했습니다.
+connect.geniusbrain@gmail.com
 
-## 연락과 공개
-
-개인정보처리방침을 게시할 공개 URL은 아직 없습니다. 웹스토어 제출 전에는 실제 공개 URL이 필요합니다. 이 문서에 가짜 주소를 넣지 않았습니다.
+공개 GitHub 경로: https://github.com/Christina0922/gpt_dot_copy/blob/main/PRIVACY_POLICY.md
 
 ## English summary
 
-Dot Copy Paste 0.1.0 is an independent extension, not an official or affiliated OpenAI product. Its content script is declared for `https://chatgpt.com/*`. Version 0.1.0 does not read message text because the Dot conversation structure is unverified and no buttons are added. Only the on/off setting and language are stored locally. Clipboard text is designed to be read only when the user clicks Paste, and message text only when the user activates Copy. Nothing is sent to an external server. No public privacy-policy URL exists yet.
+Dot Copy Paste 0.2.0 is an independent Chrome extension, not an official or affiliated OpenAI product. The Chrome Web Store overview calls it a test build and says buttons stay hidden until a ChatGPT Dot chat page is verified. Copy reads only the selected visible message after a user click and writes it as plain text or Markdown, as the user chose. Paste is experimental and does not send messages. Settings stay in local `chrome.storage`. Conversation and clipboard text are not sent to an external server.

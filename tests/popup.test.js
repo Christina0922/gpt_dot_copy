@@ -53,12 +53,12 @@ test("popup does not request clipboard permission or read text until the button 
   const doc = popupDom();
   const chrome = fakeChrome();
   let reads = 0;
-  const popup = wirePopup(doc, { chrome, uiLanguage: "ko", version: "0.1.0" });
+  const popup = wirePopup(doc, { chrome, uiLanguage: "ko", version: "0.2.0" });
   await popup.init();
   assert.equal(chrome.calls.includes("request"), false);
   assert.equal(reads, 0);
   assert.equal(doc.querySelector("[data-i18n='domUnverified']").textContent.includes("버튼을 넣지 않습니다"), true);
-  assert.equal(doc.querySelector("[data-role='version']").textContent, "0.1.0");
+  assert.equal(doc.querySelector("[data-role='version']").textContent, "0.2.0");
   doc.querySelector("[data-action='allow-clipboard']").click();
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(chrome.calls.filter((call) => call === "request").length, 1);

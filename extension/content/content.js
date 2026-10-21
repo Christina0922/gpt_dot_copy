@@ -3,7 +3,8 @@
 const { DEFAULT_SETTINGS, normalizeSettings, loadSettings, saveSettings } = (() => {
 const DEFAULT_SETTINGS = {
   enabled: true,
-  language: "auto"
+  language: "auto",
+  copyFormat: "text"
 };
 
 function normalizeSettings(value) {
@@ -11,7 +12,8 @@ function normalizeSettings(value) {
   const language = source.language === "ko" || source.language === "en" ? source.language : "auto";
   return {
     enabled: source.enabled !== false,
-    language
+    language,
+    copyFormat: source.copyFormat === "markdown" ? "markdown" : "text"
   };
 }
 
@@ -36,6 +38,14 @@ const MESSAGES = {
     copy: "Copy",
     copyShown: "Copy the text currently shown",
     copyBusy: "You can copy after the reply finishes",
+    copyMarkdown: "Copy MD",
+    copyShownMarkdown: "Copy the shown text as Markdown",
+    copyFormatMenu: "Choose copy format",
+    copyAsText: "Copy as text",
+    copyAsMarkdown: "Copy as Markdown",
+    copyFormatLabel: "Default copy format",
+    copyFormatText: "Text",
+    copyFormatMarkdown: "Markdown",
     paste: "Paste",
     copied: "Copied",
     pasted: "Pasted",
@@ -45,7 +55,7 @@ const MESSAGES = {
     composerMissing: "The input field was not found. Nothing was changed.",
     insertRejected: "The input field did not accept the paste. Nothing was changed.",
     popupTitle: "Dot Copy Paste",
-    popupIntro: "Turns copy and paste buttons on or off, and shows the version.",
+    popupIntro: "Turns copy and paste buttons on or off, sets the copy format, and shows the version.",
     enabledLabel: "Use copy and paste buttons",
     languageLabel: "Language",
     languageAuto: "Browser language",
@@ -67,6 +77,14 @@ const MESSAGES = {
     copy: "복사",
     copyShown: "현재 표시된 내용 복사",
     copyBusy: "답변이 끝난 뒤 복사할 수 있습니다",
+    copyMarkdown: "MD 복사",
+    copyShownMarkdown: "현재 표시된 내용을 마크다운으로 복사",
+    copyFormatMenu: "복사 형식 선택",
+    copyAsText: "텍스트로 복사",
+    copyAsMarkdown: "마크다운으로 복사",
+    copyFormatLabel: "기본 복사 형식",
+    copyFormatText: "텍스트",
+    copyFormatMarkdown: "마크다운",
     paste: "붙여넣기",
     copied: "복사됨",
     pasted: "붙여넣음",
@@ -76,7 +94,7 @@ const MESSAGES = {
     composerMissing: "입력창을 찾지 못했습니다. 입력한 내용은 바꾸지 않았습니다.",
     insertRejected: "입력창이 붙여넣기를 받아들이지 않았습니다. 입력한 내용은 바꾸지 않았습니다.",
     popupTitle: "Dot Copy Paste",
-    popupIntro: "복사·붙여넣기 버튼을 켜거나 끄고, 버전을 확인합니다.",
+    popupIntro: "복사·붙여넣기 버튼을 켜거나 끄고, 복사 형식을 정하고, 버전을 확인합니다.",
     enabledLabel: "복사·붙여넣기 버튼 사용",
     languageLabel: "언어",
     languageAuto: "브라우저 언어",
@@ -157,7 +175,7 @@ function computeAnchorPosition({ anchor, width, height, viewportWidth, viewportH
 return { findCopyAnchor, computeAnchorPosition };
 })();
 
-const { extractPlainText, hasCopyableText } = (() => {
+const { joinBlocks, PLAIN_FORMAT, extractWithFormat, extractPlainText, hasCopyableText } = (() => {
 const SKIP_TAGS = new Set([
   "BUTTON",
   "TIME",
@@ -177,8 +195,13 @@ const SKIP_TAGS = new Set([
   "FORM"
 ]);
 
-const PARAGRAPH_TAGS = new Set(["P", "H1", "H2", "H3", "H4", "H5", "H6", "PRE", "BLOCKQUOTE", "FIGCAPTION"]);
-const LINE_TAGS = new Set(["LI", "TR", "DT", "DD"]);
+const BLOCK_TAGS = new Set([
+  "P", "H1", "H2", "H3", "H4", "H5", "H6", "PRE", "BLOCKQUOTE", "FIGCAPTION", "FIGURE",
+  "UL", "OL", "LI", "DL", "DT", "DD", "TABLE", "THEAD", "TBODY", "TFOOT", "TR", "CAPTION", "HR",
+  "DIV", "SECTION", "ARTICLE", "HEADER", "FOOTER", "MAIN", "ASIDE", "NAV", "DETAILS", "SUMMARY"
+]);
+
+const BLOCK_SELECTOR = [...BLOCK_TAGS].map((tag) => tag.toLowerCase()).join(",");
 
 function isSkipped(node) {
   if (!node || node.nodeType !== 1) return false;
@@ -197,107 +220,396 @@ function isSkipped(node) {
   return false;
 }
 
-function hasBlockChild(element) {
-  return [...element.children].some((child) => {
-    if (isSkipped(child)) return false;
-    return PARAGRAPH_TAGS.has(child.tagName) || LINE_TAGS.has(child.tagName) || child.tagName === "UL" || child.tagName === "OL" || child.tagName === "DIV" || child.tagName === "SECTION" || child.tagName === "PRE";
-  });
-}
-
-function blockKind(element) {
-  if (PARAGRAPH_TAGS.has(element.tagName)) return "paragraph";
-  if (LINE_TAGS.has(element.tagName)) return "line";
-  if ((element.tagName === "DIV" || element.tagName === "SECTION" || element.tagName === "ARTICLE") && !hasBlockChild(element)) {
-    return "line";
+function skippedBetween(node, ancestor) {
+  for (let current = node; current && current !== ancestor; current = current.parentElement) {
+    if (isSkipped(current)) return true;
   }
-  return "transparent";
+  return false;
 }
 
-function listMarker(element) {
-  const parent = element.parentElement;
-  if (!parent || parent.tagName !== "OL" && parent.tagName !== "UL") return "";
-  if (parent.tagName === "UL") return "- ";
-  const items = [...parent.children].filter((child) => child.tagName === "LI");
-  const start = Number.parseInt(parent.getAttribute("start") || "1", 10);
-  const index = items.indexOf(element);
-  return `${(Number.isFinite(start) ? start : 1) + Math.max(0, index)}. `;
+// Code keeps every character: no whitespace collapsing, no trimming.
+function rawText(node) {
+  if (node.nodeType === 3) return node.nodeValue || "";
+  if (node.nodeType !== 1 || isSkipped(node)) return "";
+  if (node.tagName === "BR") return "\n";
+  let text = "";
+  for (const child of node.childNodes) text += rawText(child);
+  return text;
 }
 
-function pushBreak(parts, kind) {
-  const text = parts.join("\u0000");
-  const combined = text.replaceAll("\u0000", "");
-  if (!combined.trim()) {
-    parts.length = 0;
-    return;
+function codeLanguage(...elements) {
+  for (const element of elements) {
+    const match = /(?:^|\s)(?:language|lang)-([\w+#.-]+)/.exec(element?.getAttribute?.("class") || "");
+    if (match) return match[1];
   }
-  const needed = kind === "paragraph" ? "\n\n" : "\n";
-  if (combined.endsWith(needed)) return;
-  if (kind === "paragraph" && combined.endsWith("\n")) {
-    parts.push("\n");
-    return;
-  }
-  parts.push(needed);
+  return "";
 }
 
-function walk(node, parts, pre) {
-  if (node.nodeType === 3) {
-    const value = node.nodeValue || "";
-    if (pre) {
-      parts.push(value);
+function isMultilineCode(element) {
+  return element.tagName === "CODE" && !element.closest("pre") && rawText(element).includes("\n");
+}
+
+function isBlockElement(element) {
+  return BLOCK_TAGS.has(element.tagName) || isMultilineCode(element);
+}
+
+function containsBlock(element) {
+  return [...element.querySelectorAll(BLOCK_SELECTOR)].some((node) => !skippedBetween(node, element));
+}
+
+function collapse(value) {
+  return value.replace(/\s+/g, " ");
+}
+
+function appendInline(acc, piece) {
+  if (!piece) return acc;
+  if (piece.startsWith(" ") && (acc === "" || /[ \n]$/.test(acc))) return acc + piece.slice(1);
+  return acc + piece;
+}
+
+function finishInline(value) {
+  return value.replace(/[ \t]*\n[ \t]*/g, "\n").replace(/^[ \n]+|[ \n]+$/g, "");
+}
+
+function renderInlineChildren(element, ctx) {
+  let text = "";
+  for (const child of element.childNodes) {
+    if (child.nodeType === 3) {
+      text = appendInline(text, ctx.format.text(collapse(child.nodeValue || ""), ctx));
+      continue;
+    }
+    if (child.nodeType !== 1 || isSkipped(child)) continue;
+    if (child.tagName === "BR") {
+      text = ctx.cell ? appendInline(text, " ") : text.replace(/ $/, "") + "\n";
+      continue;
+    }
+    text = appendInline(text, renderInline(child, ctx));
+  }
+  return text;
+}
+
+function renderInline(element, ctx) {
+  if (element.tagName === "CODE") return ctx.format.inlineCode(rawText(element).replace(/\r?\n/g, " "), ctx);
+  return ctx.format.inline(element, renderInlineChildren(element, ctx), ctx);
+}
+
+function renderChildren(element, ctx) {
+  const blocks = [];
+  let inline = "";
+  const flush = () => {
+    const text = finishInline(inline);
+    inline = "";
+    if (text) blocks.push({ kind: "para", text: ctx.format.paragraph(text) });
+  };
+  for (const child of element.childNodes) {
+    if (child.nodeType === 3) {
+      inline = appendInline(inline, ctx.format.text(collapse(child.nodeValue || ""), ctx));
+      continue;
+    }
+    if (child.nodeType !== 1 || isSkipped(child)) continue;
+    if (child.tagName === "BR") {
+      inline = inline.replace(/ $/, "") + "\n";
+      continue;
+    }
+    if (isBlockElement(child)) {
+      flush();
+      blocks.push(...renderBlock(child, ctx));
+      continue;
+    }
+    if (containsBlock(child)) {
+      flush();
+      blocks.push(...renderChildren(child, ctx));
+      continue;
+    }
+    inline = appendInline(inline, renderInline(child, ctx));
+  }
+  flush();
+  return blocks;
+}
+
+function renderCode(code, languageSource, ctx) {
+  const text = code.replace(/\r\n?/g, "\n").replace(/\n$/, "");
+  if (!text.trim()) return [];
+  return [{ kind: "code", verbatim: true, text: ctx.format.codeBlock(text, codeLanguage(...languageSource)) }];
+}
+
+function renderPre(pre, ctx) {
+  // Code block headers (language label, copy button) sit inside PRE next to CODE.
+  const code = [...pre.querySelectorAll("code")].find((node) => !skippedBetween(node, pre));
+  if (code) return renderCode(rawText(code), [code, pre], ctx);
+  return renderCode(rawText(pre), [pre], ctx);
+}
+
+function indentLines(text, pad) {
+  return text.split("\n").map((line) => (line ? pad + line : line)).join("\n");
+}
+
+// Plain text leaves code at column 0 so it pastes unchanged; blank lines mark where it starts and ends.
+function isFlushCode(block, ctx) {
+  return block.verbatim === true && !ctx.format.indentVerbatim;
+}
+
+function endsWithFlushCode(block, ctx) {
+  return isFlushCode(block, ctx) || block.flushEnd === true;
+}
+
+function renderListItem(marker, blocks, ctx) {
+  const pad = " ".repeat(marker.length);
+  let text = "";
+  blocks.forEach((block, index) => {
+    if (index === 0) {
+      text = isFlushCode(block, ctx)
+        ? `${marker.trimEnd()}\n\n${block.text}`
+        : marker + indentLines(block.text, pad).slice(pad.length);
       return;
     }
-    if (!value.trim()) return;
-    parts.push(value.replace(/\s+/g, " "));
-    return;
-  }
-  if (node.nodeType !== 1 || isSkipped(node)) return;
-  if (node.tagName === "BR") {
-    parts.push("\n");
-    return;
-  }
-  if (node.tagName === "CODE") {
-    const multiline = !pre && /\n/.test(node.textContent || "");
-    if (multiline) pushBreak(parts, "paragraph");
-    for (const child of node.childNodes) walk(child, parts, true);
-    if (multiline) pushBreak(parts, "paragraph");
-    return;
-  }
-
-  const preserve = pre || node.tagName === "PRE" || (node.tagName === "CODE" && /\n/.test(node.textContent || ""));
-  if (preserve) {
-    if (!pre) pushBreak(parts, "paragraph");
-    for (const child of node.childNodes) walk(child, parts, true);
-    if (!pre) pushBreak(parts, "paragraph");
-    return;
-  }
-
-  const kind = blockKind(node);
-  if (kind !== "transparent") pushBreak(parts, kind);
-  if (node.tagName === "LI") parts.push(listMarker(node));
-  for (const child of node.childNodes) walk(child, parts, false);
-  if (kind !== "transparent") pushBreak(parts, kind);
+    const previous = blocks[index - 1];
+    const loose = ctx.format.looseItems && block.kind === "para" && previous.kind === "para";
+    const gap = loose || isFlushCode(block, ctx) || endsWithFlushCode(previous, ctx) ? "\n\n" : "\n";
+    text += gap + indentLines(block.text, isFlushCode(block, ctx) ? "" : pad);
+  });
+  const last = blocks.at(-1);
+  return { text: text || marker.trimEnd(), flushEnd: Boolean(last && endsWithFlushCode(last, ctx)) };
 }
 
-function cleanup(value) {
-  return value
-    .replace(/\r\n?/g, "\n")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+function renderList(list, ctx) {
+  const ordered = list.tagName === "OL";
+  const start = Number.parseInt(list.getAttribute("start") || "1", 10);
+  let number = Number.isFinite(start) ? start : 1;
+  const items = [];
+  for (const child of list.children) {
+    if (isSkipped(child)) continue;
+    if (child.tagName !== "LI") {
+      const blocks = renderChildren(child, ctx);
+      if (blocks.length) items.push({ text: joinBlocks(blocks), flushEnd: endsWithFlushCode(blocks.at(-1), ctx) });
+      continue;
+    }
+    const marker = ordered ? `${number}. ` : "- ";
+    number += 1;
+    items.push(renderListItem(marker, renderChildren(child, ctx), ctx));
+  }
+  if (!items.length) return [];
+  let text = "";
+  items.forEach((item, index) => {
+    if (index > 0) text += items[index - 1].flushEnd ? "\n\n" : "\n";
+    text += item.text;
+  });
+  return [{ kind: "list", text, flushEnd: items.at(-1).flushEnd }];
+}
+
+function tableRows(table) {
+  const rows = [];
+  const visit = (node) => {
+    for (const child of node.children) {
+      if (isSkipped(child)) continue;
+      if (child.tagName === "TR") rows.push(child);
+      else if (child.tagName === "THEAD" || child.tagName === "TBODY" || child.tagName === "TFOOT") visit(child);
+    }
+  };
+  visit(table);
+  return rows;
+}
+
+function renderTable(table, ctx) {
+  const blocks = [];
+  const caption = [...table.children].find((child) => child.tagName === "CAPTION" && !isSkipped(child));
+  if (caption) blocks.push(...renderChildren(caption, ctx));
+  const cellCtx = { ...ctx, cell: true };
+  const rows = tableRows(table)
+    .map((row) => [...row.children]
+      .filter((cell) => (cell.tagName === "TD" || cell.tagName === "TH") && !isSkipped(cell))
+      .map((cell) => finishInline(renderInlineChildren(cell, cellCtx)).replace(/\n/g, " ")))
+    .filter((cells) => cells.length > 0);
+  if (rows.length) blocks.push({ kind: "table", text: ctx.format.table(rows) });
+  return blocks;
+}
+
+function renderBlock(element, ctx) {
+  const tag = element.tagName;
+  if (/^H[1-6]$/.test(tag)) {
+    const text = finishInline(renderInlineChildren(element, ctx)).replace(/\n/g, " ");
+    return text ? [{ kind: "heading", text: ctx.format.heading(Number(tag[1]), text) }] : [];
+  }
+  if (tag === "PRE") return renderPre(element, ctx);
+  if (tag === "CODE") return renderCode(rawText(element), [element], ctx);
+  if (tag === "UL" || tag === "OL") return renderList(element, ctx);
+  if (tag === "TABLE") return renderTable(element, ctx);
+  if (tag === "HR") {
+    const rule = ctx.format.rule();
+    return rule ? [{ kind: "rule", text: rule }] : [];
+  }
+  if (tag === "BLOCKQUOTE") return ctx.format.quote(renderChildren(element, ctx));
+  const blocks = renderChildren(element, ctx);
+  // A container with only inline content reads as one line, like the old LI/TR/DIV handling.
+  if (tag !== "P" && blocks.length === 1 && blocks[0].kind === "para" && !containsBlock(element)) {
+    blocks[0].kind = "line";
+  }
+  return blocks;
+}
+
+function joinBlocks(blocks) {
+  let text = "";
+  blocks.forEach((block, index) => {
+    if (index > 0) text += blocks[index - 1].kind === "line" && block.kind === "line" ? "\n" : "\n\n";
+    text += block.text;
+  });
+  return text;
+}
+
+const PLAIN_FORMAT = {
+  indentVerbatim: false,
+  looseItems: false,
+  text: (value) => value,
+  inlineCode: (code) => code,
+  inline: (_element, inner) => inner,
+  paragraph: (text) => text,
+  heading: (_level, text) => text,
+  codeBlock: (code) => code,
+  table: (rows) => rows.map((cells) => cells.join("\t")).join("\n"),
+  rule: () => null,
+  quote: (blocks) => blocks
+};
+
+function extractWithFormat(root, format) {
+  if (!root || root.nodeType !== 1) return "";
+  const blocks = renderChildren(root, { format, cell: false });
+  return joinBlocks(blocks).replace(/\r\n?/g, "\n").replace(/^\n+|\n+$/g, "");
 }
 
 function extractPlainText(root) {
-  if (!root || root.nodeType !== 1) return "";
-  const parts = [];
-  walk(root, parts, false);
-  return cleanup(parts.join(""));
+  return extractWithFormat(root, PLAIN_FORMAT);
 }
 
 function hasCopyableText(root) {
-  return extractPlainText(root).length > 0;
+  return extractPlainText(root).trim().length > 0;
 }
 
-return { extractPlainText, hasCopyableText };
+return { joinBlocks, PLAIN_FORMAT, extractWithFormat, extractPlainText, hasCopyableText };
+})();
+
+const { MARKDOWN_FORMAT, extractMarkdown } = (() => {
+
+// Escapes stay minimal: a character is escaped only where Markdown would read it as syntax.
+// Lone *, _, -, [ in the middle of a sentence are left as they are.
+
+const ASCII_PUNCT = "!\"#$%&'()*+,\\-./:;<=>?@[\\]^_`{|}~";
+const BACKSLASH_ESCAPE = new RegExp(`\\\\(?=[${ASCII_PUNCT}])`, "g");
+const EMPHASIS_PAIR = /(^|[\s(["'])(\*{1,3}|_{1,3}|~~)(?=[^\s*_~])([^]*?[^\s\\])\2(?=$|[\s.,;:!?)\]"'])/g;
+const LINK_OPENER = /\[(?=[^\]]*\](?:\(|\[))/g;
+const HTML_TAG = /<(?=[A-Za-z/!?][^<>]*>)/g;
+const ENTITY = /&(?=#?[A-Za-z0-9]+;)/g;
+
+function escapeDelimiters(run) {
+  return run.replace(/[*_~]/g, (char) => `\\${char}`);
+}
+
+function escapeInline(value, ctx) {
+  let text = value.replace(BACKSLASH_ESCAPE, "\\\\");
+  text = text.replace(EMPHASIS_PAIR, (_, before, run, inner) => `${before}${escapeDelimiters(run)}${inner}${escapeDelimiters(run)}`);
+  if ((text.match(/`/g) || []).length >= 2) text = text.replace(/`/g, "\\`");
+  text = text.replace(LINK_OPENER, "\\[").replace(HTML_TAG, "\\<").replace(ENTITY, "\\&");
+  if (ctx.cell) text = text.replace(/\|/g, "\\|");
+  return text;
+}
+
+const LINE_START_RULES = [
+  [/^(#{1,6})(?=\s|$)/, "\\$1"],
+  [/^>/, "\\>"],
+  [/^([-*_])(?:[ \t]*\1){2,}[ \t]*$/, (line) => `\\${line}`],
+  [/^([-+*])(?=\s|$)/, "\\$1"],
+  [/^(\d{1,9})([.)])(?=\s|$)/, "$1\\$2"],
+  [/^(`{3,}|~{3,})/, (run) => `\\${run}`],
+  [/^=+[ \t]*$/, (line) => `\\${line}`]
+];
+
+function escapeLineStart(line) {
+  for (const [pattern, replacement] of LINE_START_RULES) {
+    if (pattern.test(line)) return line.replace(pattern, replacement);
+  }
+  return line;
+}
+
+function longestBacktickRun(text) {
+  let longest = 0;
+  for (const match of text.matchAll(/`+/g)) longest = Math.max(longest, match[0].length);
+  return longest;
+}
+
+function wrap(inner, marker) {
+  const match = /^(\s*)([^]*?)(\s*)$/.exec(inner);
+  if (!match[2]) return inner;
+  return `${match[1]}${marker}${match[2]}${marker}${match[3]}`;
+}
+
+function linkDestination(href) {
+  return href.replace(/ /g, "%20").replace(/\(/g, "%28").replace(/\)/g, "%29");
+}
+
+function renderLink(element, inner) {
+  const href = (element.getAttribute("href") || "").trim();
+  if (!/^(https?:|mailto:)/i.test(href)) return inner;
+  const label = (inner.trim() || href).replace(/(^|[^\\])\]/g, "$1\\]");
+  return `[${label}](${linkDestination(href)})`;
+}
+
+function quoteBlocks(blocks) {
+  if (!blocks.length) return [];
+  const text = joinBlocks(blocks).split("\n").map((line) => (line ? `> ${line}` : ">")).join("\n");
+  return [{ kind: "quote", text }];
+}
+
+function renderTable(rows) {
+  const width = Math.max(...rows.map((cells) => cells.length));
+  const line = (cells) => `| ${Array.from({ length: width }, (_, index) => cells[index] || "").join(" | ")} |`;
+  const divider = `| ${Array.from({ length: width }, () => "---").join(" | ")} |`;
+  return [line(rows[0]), divider, ...rows.slice(1).map(line)].join("\n");
+}
+
+const MARKDOWN_FORMAT = {
+  indentVerbatim: true,
+  looseItems: true,
+  text: escapeInline,
+  inlineCode(value, ctx) {
+    if (!value) return "";
+    const code = ctx.cell ? value.replace(/\|/g, "\\|") : value;
+    const fence = "`".repeat(longestBacktickRun(code) + 1);
+    const pad = code.startsWith("`") || code.endsWith("`") || (code.startsWith(" ") && code.endsWith(" ") && code.trim()) ? " " : "";
+    return `${fence}${pad}${code}${pad}${fence}`;
+  },
+  inline(element, inner) {
+    switch (element.tagName) {
+      case "STRONG":
+      case "B":
+        return wrap(inner, "**");
+      case "EM":
+      case "I":
+        return wrap(inner, "*");
+      case "DEL":
+      case "S":
+      case "STRIKE":
+        return wrap(inner, "~~");
+      case "A":
+        return renderLink(element, inner);
+      default:
+        return inner;
+    }
+  },
+  paragraph: (text) => text.split("\n").map(escapeLineStart).join("\n"),
+  heading: (level, text) => `${"#".repeat(level)} ${text}`,
+  codeBlock(code, language) {
+    const fence = "`".repeat(Math.max(3, longestBacktickRun(code) + 1));
+    return `${fence}${language}\n${code}\n${fence}`;
+  },
+  table: renderTable,
+  rule: () => "---",
+  quote: quoteBlocks
+};
+
+function extractMarkdown(root) {
+  return extractWithFormat(root, MARKDOWN_FORMAT);
+}
+
+return { MARKDOWN_FORMAT, extractMarkdown };
 })();
 
 const { isEditorEmpty, readTextareaCaret, readContentEditableCaret, insertPlainText } = (() => {
@@ -649,6 +961,8 @@ function createController({
   window: view,
   clipboard,
   getLanguage,
+  getCopyFormat = () => "text",
+  setCopyFormat = () => {},
   schedule = (callback) => {
     const raf = view.requestAnimationFrame;
     if (typeof raf === "function") raf.call(view, () => callback());
@@ -657,6 +971,7 @@ function createController({
 }) {
   const copyUi = new Map();
   let pasteUi = null;
+  let openMenuUi = null;
   let savedCaret = null;
   let observer = null;
   let parentObserver = null;
@@ -752,34 +1067,157 @@ function createController({
     }
   }
 
-  function applyCopyLabel(button, state) {
+  function currentFormat() {
+    return getCopyFormat() === "markdown" ? "markdown" : "text";
+  }
+
+  function applyCopyLabel(ui, state) {
+    const { button, toggle, items } = ui;
+    const markdown = currentFormat() === "markdown";
+    toggle.textContent = "▾";
+    toggle.setAttribute("aria-label", t("copyFormatMenu"));
+    toggle.title = t("copyFormatMenu");
+    for (const item of items) {
+      item.textContent = t(item.dataset.dcpFormat === "markdown" ? "copyAsMarkdown" : "copyAsText");
+      item.setAttribute("aria-checked", String(item.dataset.dcpFormat === currentFormat()));
+    }
     if (state === "generating") {
       button.disabled = true;
-      button.textContent = t("copy");
+      toggle.disabled = true;
+      button.textContent = t(markdown ? "copyMarkdown" : "copy");
       button.setAttribute("aria-label", t("copyBusy"));
+      if (openMenuUi === ui) closeMenu(ui, false);
       return;
     }
     button.disabled = false;
-    if (state === "unknown") {
-      button.textContent = t("copyShown");
-      button.setAttribute("aria-label", t("copyShown"));
-      return;
-    }
-    button.textContent = t("copy");
-    button.setAttribute("aria-label", t("copy"));
+    toggle.disabled = false;
+    const key = state === "unknown" ? (markdown ? "copyShownMarkdown" : "copyShown") : (markdown ? "copyMarkdown" : "copy");
+    button.textContent = t(key);
+    button.setAttribute("aria-label", t(key));
   }
 
-  async function onCopy(message, status) {
+  function refreshCopyLabels() {
+    for (const [message, ui] of copyUi) applyCopyLabel(ui, adapter.getGenerationState(message));
+  }
+
+  async function onCopy(message, status, format) {
     const state = adapter.getGenerationState(message);
     if (state === "generating") return;
     const body = adapter.getBodyElement(message);
-    const text = body ? extractPlainText(body) : "";
+    const text = body ? (format === "markdown" ? extractMarkdown(body) : extractPlainText(body)) : "";
     if (!text) {
       setStatus(status, t("copyFailed"), "error");
       return;
     }
     const result = await writePlainText(text, clipboard, doc);
     setStatus(status, result.ok ? t("copied") : t("copyFailed"), result.ok ? "success" : "error");
+  }
+
+  function openMenu(ui) {
+    if (openMenuUi && openMenuUi !== ui) closeMenu(openMenuUi, false);
+    openMenuUi = ui;
+    ui.menu.hidden = false;
+    ui.toggle.setAttribute("aria-expanded", "true");
+    const checked = ui.items.find((item) => item.dataset.dcpFormat === currentFormat()) || ui.items[0];
+    checked.focus();
+  }
+
+  function closeMenu(ui, returnFocus) {
+    ui.menu.hidden = true;
+    ui.toggle.setAttribute("aria-expanded", "false");
+    if (openMenuUi === ui) openMenuUi = null;
+    if (returnFocus) ui.toggle.focus();
+  }
+
+  function onMenuKey(ui, event) {
+    const index = ui.items.indexOf(doc.activeElement);
+    const move = { ArrowDown: 1, ArrowUp: -1 }[event.key];
+    if (move) {
+      event.preventDefault();
+      ui.items[(index + move + ui.items.length) % ui.items.length].focus();
+      return;
+    }
+    if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      ui.items[event.key === "Home" ? 0 : ui.items.length - 1].focus();
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      closeMenu(ui, true);
+      return;
+    }
+    if (event.key === "Tab") closeMenu(ui, false);
+  }
+
+  function createCopyUi(message) {
+    const wrap = doc.createElement("span");
+    wrap.setAttribute("data-dcp-ui", "");
+    wrap.className = "dcp-copy-slot";
+    const split = doc.createElement("span");
+    split.className = "dcp-split";
+    const button = doc.createElement("button");
+    button.type = "button";
+    button.className = "dcp-btn dcp-btn-main";
+    button.setAttribute("data-dcp-copy", "");
+    const toggle = doc.createElement("button");
+    toggle.type = "button";
+    toggle.className = "dcp-btn dcp-btn-toggle";
+    toggle.setAttribute("data-dcp-copy-menu", "");
+    toggle.setAttribute("aria-haspopup", "menu");
+    toggle.setAttribute("aria-expanded", "false");
+    const menu = doc.createElement("span");
+    menu.className = "dcp-menu";
+    menu.setAttribute("role", "menu");
+    menu.hidden = true;
+    const items = ["text", "markdown"].map((format) => {
+      const item = doc.createElement("button");
+      item.type = "button";
+      item.className = "dcp-menu-item";
+      item.setAttribute("role", "menuitemradio");
+      item.dataset.dcpFormat = format;
+      menu.append(item);
+      return item;
+    });
+    const status = doc.createElement("span");
+    status.setAttribute("data-dcp-ui", "");
+    status.className = "dcp-status";
+    status.setAttribute("role", "status");
+    status.setAttribute("aria-live", "polite");
+    split.append(button, toggle);
+    wrap.append(split, menu, status);
+    const ui = { wrap, button, toggle, menu, items, status };
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onCopy(message, status, currentFormat());
+    });
+    toggle.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (openMenuUi === ui) closeMenu(ui, true);
+      else openMenu(ui);
+    });
+    toggle.addEventListener("keydown", (event) => {
+      if (event.key !== "ArrowDown" || openMenuUi === ui) return;
+      event.preventDefault();
+      openMenu(ui);
+    });
+    menu.addEventListener("keydown", (event) => onMenuKey(ui, event));
+    for (const item of items) {
+      item.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const format = item.dataset.dcpFormat;
+        closeMenu(ui, true);
+        // Copy first so the clipboard write stays inside this click.
+        onCopy(message, status, format);
+        setCopyFormat(format);
+        refreshCopyLabels();
+      });
+    }
+    return ui;
   }
 
   function syncCopyButton(message) {
@@ -794,30 +1232,12 @@ function createController({
     }
     let ui = copyUi.get(message);
     if (!ui) {
-      const wrap = doc.createElement("span");
-      wrap.setAttribute("data-dcp-ui", "");
-      wrap.className = "dcp-copy-slot";
-      const button = doc.createElement("button");
-      button.type = "button";
-      button.className = "dcp-btn";
-      button.setAttribute("data-dcp-copy", "");
-      const status = doc.createElement("span");
-      status.setAttribute("data-dcp-ui", "");
-      status.className = "dcp-status";
-      status.setAttribute("role", "status");
-      status.setAttribute("aria-live", "polite");
-      wrap.append(button, status);
-      button.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        onCopy(message, status);
-      });
-      ui = { wrap, button, status };
+      ui = createCopyUi(message);
       copyUi.set(message, ui);
     }
     const body = adapter.getBodyElement(message);
     if (body) placeCopySlot(ui.wrap, body);
-    applyCopyLabel(ui.button, adapter.getGenerationState(message));
+    applyCopyLabel(ui, adapter.getGenerationState(message));
   }
 
   async function onPaste(status) {
@@ -987,6 +1407,9 @@ function createController({
     on(doc, "selectionchange", rememberCaret, true);
     on(doc, "keyup", rememberCaret, true);
     on(doc, "mouseup", rememberCaret, true);
+    on(doc, "pointerdown", (event) => {
+      if (openMenuUi && !openMenuUi.wrap.contains(event.target)) closeMenu(openMenuUi, false);
+    }, true);
     on(doc, "scroll", () => updatePositions(), { capture: true, passive: true });
     on(view, "resize", () => updatePositions());
     return { active: true, reason: detection.reason };
@@ -1000,6 +1423,7 @@ function createController({
     copyUi.clear();
     pasteUi?.wrap.remove();
     pasteUi = null;
+    openMenuUi = null;
     savedCaret = null;
     queue = [];
     queued = false;
@@ -1010,6 +1434,7 @@ function createController({
   return {
     start,
     stop,
+    refreshCopyLabels,
     get scanCount() {
       return scanCount;
     },
@@ -1032,7 +1457,16 @@ function startApp({
   clipboard = view.navigator.clipboard
 }) {
   let controller = null;
-  let settings = { enabled: true, language: "auto" };
+  let settings = normalizeSettings(null);
+
+  function setCopyFormat(copyFormat) {
+    settings = { ...settings, copyFormat };
+    const storage = chrome.storage?.local;
+    if (!storage || typeof storage.set !== "function") return;
+    saveSettings(storage, settings).catch((error) => {
+      console.error("[Dot Copy Paste]", error?.name || "Error");
+    });
+  }
 
   async function restart() {
     stopWatching();
@@ -1050,7 +1484,9 @@ function startApp({
       document: doc,
       window: view,
       clipboard,
-      getLanguage: () => resolveLanguage(settings.language, uiLanguage)
+      getLanguage: () => resolveLanguage(settings.language, uiLanguage),
+      getCopyFormat: () => settings.copyFormat,
+      setCopyFormat
     });
     const result = controller.start();
     if (!result.active && result.reason === "dot-landmarks-missing") watchForDotLandmarks();
@@ -1088,7 +1524,15 @@ function startApp({
   }
 
   chrome.storage?.onChanged.addListener((changes, area) => {
-    if (area === "local" && changes.settings) restart();
+    if (area !== "local" || !changes.settings) return;
+    const next = normalizeSettings(changes.settings.newValue);
+    // A format change alone only relabels the buttons, so a "Copied" status is not wiped by a restart.
+    if (controller && next.enabled === settings.enabled && next.language === settings.language) {
+      settings = next;
+      controller.refreshCopyLabels();
+      return;
+    }
+    restart();
   });
 
   if (view.navigation && typeof view.navigation.addEventListener === "function") {
