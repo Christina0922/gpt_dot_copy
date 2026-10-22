@@ -138,7 +138,7 @@ function createTranslator(language) {
 return { MESSAGES, resolveLanguage, translate, createTranslator };
 })();
 
-const { findCopyAnchor, computeAnchorPosition } = (() => {
+const { findCopyAnchor, computeAnchorPosition, computeMenuPosition } = (() => {
 const BLOCK_END = new Set(["PRE", "TABLE", "UL", "OL", "BLOCKQUOTE"]);
 
 function contentChildren(element) {
@@ -179,7 +179,22 @@ function computeAnchorPosition({ anchor, width, height, viewportWidth, viewportH
   return { hidden: false, top, left };
 }
 
-return { findCopyAnchor, computeAnchorPosition };
+// Places an open menu beside its trigger inside the visible area (`bounds`: the part of the message
+// list not covered by the composer). Opens downward when it fits, upward when only that fits, and
+// otherwise toward the side with more room.
+function computeMenuPosition({ trigger, width, height, bounds, viewportWidth, viewportHeight, gap = 4, margin = 8 }) {
+  if (!trigger || trigger.bottom <= bounds.top || trigger.top >= bounds.bottom) return { hidden: true };
+  const spaceBelow = bounds.bottom - trigger.bottom - gap;
+  const spaceAbove = trigger.top - bounds.top - gap;
+  let placement = "below";
+  if (spaceBelow < height) placement = spaceAbove >= height || spaceAbove > spaceBelow ? "above" : "below";
+  const preferred = placement === "below" ? trigger.bottom + gap : trigger.top - gap - height;
+  const top = clamp(preferred, margin, Math.max(margin, viewportHeight - height - margin));
+  const left = clamp(trigger.left, margin, Math.max(margin, viewportWidth - width - margin));
+  return { hidden: false, placement, top, left };
+}
+
+return { findCopyAnchor, computeAnchorPosition, computeMenuPosition };
 })();
 
 const { joinBlocks, PLAIN_FORMAT, extractWithFormat, extractPlainText, hasCopyableText } = (() => {
@@ -970,6 +985,11 @@ const liveAdapter = {
     if (!element) return null;
     return { kind: "contenteditable", element };
   },
+  // The whole composer block; an open menu must not extend under it.
+  getComposerArea(doc) {
+    if (typeof doc?.querySelector !== "function") return null;
+    return doc.querySelector("[data-role='composer']");
+  },
   composerHasDraft(element) {
     const send = findSendButton(element?.closest?.("[data-role='composer']"));
     if (!send) return null;
@@ -981,6 +1001,11 @@ return { detectDotScreen, findSendButton, liveAdapter };
 })();
 
 const { createController } = (() => {
+
+
+
+
+
 
 function relevantElement(node) {
   const element = node?.nodeType === 1 ? node : node?.parentElement;
@@ -1182,6 +1207,7 @@ function createController({
     for (const [message, ui] of copyUi) {
       guard("position", message, () => {
         if (!message.isConnected) {
+          if (openMenuUi === ui) closeMenu(ui, false);
           ui.wrap.remove();
           copyUi.delete(message);
           return;
@@ -1214,19 +1240,21 @@ function createController({
       item.textContent = t(item.dataset.dcpFormat === "markdown" ? "copyAsMarkdown" : "copyAsText");
       item.setAttribute("aria-checked", String(item.dataset.dcpFormat === currentFormat()));
     }
+    // The visible label stays short for every message; the longer meaning lives in the tooltip and aria-label.
+    button.textContent = t(markdown ? "copyMarkdown" : "copy");
     if (state === "generating") {
       button.disabled = true;
       toggle.disabled = true;
-      button.textContent = t(markdown ? "copyMarkdown" : "copy");
       button.setAttribute("aria-label", t("copyBusy"));
+      button.title = t("copyBusy");
       if (openMenuUi === ui) closeMenu(ui, false);
       return;
     }
     button.disabled = false;
     toggle.disabled = false;
     const key = state === "unknown" ? (markdown ? "copyShownMarkdown" : "copyShown") : (markdown ? "copyMarkdown" : "copy");
-    button.textContent = t(key);
     button.setAttribute("aria-label", t(key));
+    button.title = t(key);
   }
 
   function refreshCopyLabels() {
@@ -1246,18 +1274,61 @@ function createController({
     setStatus(status, result.ok ? t("copied") : t("copyFailed"), result.ok ? "success" : "error");
   }
 
+  // The part of the message list that is on screen and not under the composer.
+  function visibleBounds() {
+    const bounds = { top: 0, bottom: view.innerHeight || 768 };
+    const root = adapter.getObserverRoot(doc)?.getBoundingClientRect?.();
+    if (root && root.height > 0) {
+      bounds.top = Math.max(bounds.top, root.top);
+      bounds.bottom = Math.min(bounds.bottom, root.bottom);
+    }
+    const composer = (adapter.getComposerArea?.(doc) || adapter.getComposer(doc)?.element)?.getBoundingClientRect?.();
+    if (composer && composer.height > 0 && composer.top > bounds.top && composer.top < bounds.bottom) bounds.bottom = composer.top;
+    return bounds;
+  }
+
+  function positionMenu(ui) {
+    if (!ui.toggle.isConnected) {
+      closeMenu(ui, false);
+      return;
+    }
+    const split = ui.toggle.parentElement.getBoundingClientRect();
+    // Without layout (no size), the menu keeps its default spot.
+    if (split.width === 0 && split.height === 0) return;
+    const position = computeMenuPosition({
+      trigger: split,
+      width: ui.menu.offsetWidth || 160,
+      height: ui.menu.offsetHeight || 72,
+      bounds: visibleBounds(),
+      viewportWidth: view.innerWidth || 1024,
+      viewportHeight: view.innerHeight || 768
+    });
+    if (position.hidden) {
+      closeMenu(ui, false);
+      return;
+    }
+    ui.menu.dataset.dcpPlacement = position.placement;
+    ui.menu.style.top = `${position.top}px`;
+    ui.menu.style.left = `${position.left}px`;
+  }
+
   function openMenu(ui) {
     if (openMenuUi && openMenuUi !== ui) closeMenu(openMenuUi, false);
     openMenuUi = ui;
+    // While open, the menu sits on <body> so the bubble's stacking and clipping cannot cover it.
+    (doc.body || doc.documentElement).append(ui.menu);
     ui.menu.hidden = false;
     ui.toggle.setAttribute("aria-expanded", "true");
+    positionMenu(ui);
+    if (openMenuUi !== ui) return;
     const checked = ui.items.find((item) => item.dataset.dcpFormat === currentFormat()) || ui.items[0];
-    checked.focus();
+    checked.focus({ preventScroll: true });
   }
 
   function closeMenu(ui, returnFocus) {
     ui.menu.hidden = true;
     ui.toggle.setAttribute("aria-expanded", "false");
+    if (ui.menu.parentElement !== ui.wrap) ui.wrap.insertBefore(ui.menu, ui.status);
     if (openMenuUi === ui) openMenuUi = null;
     if (returnFocus) ui.toggle.focus();
   }
@@ -1301,6 +1372,7 @@ function createController({
     toggle.setAttribute("aria-haspopup", "menu");
     toggle.setAttribute("aria-expanded", "false");
     const menu = doc.createElement("span");
+    menu.setAttribute("data-dcp-ui", "");
     menu.className = "dcp-menu";
     menu.setAttribute("role", "menu");
     menu.hidden = true;
@@ -1577,10 +1649,14 @@ function createController({
     on(doc, "keyup", rememberCaret, true);
     on(doc, "mouseup", rememberCaret, true);
     on(doc, "pointerdown", (event) => {
-      if (openMenuUi && !openMenuUi.wrap.contains(event.target)) closeMenu(openMenuUi, false);
+      if (openMenuUi && !openMenuUi.wrap.contains(event.target) && !openMenuUi.menu.contains(event.target)) closeMenu(openMenuUi, false);
     }, true);
-    on(doc, "scroll", () => updatePositions(), { capture: true, passive: true });
-    on(view, "resize", () => updatePositions());
+    const reflow = () => {
+      updatePositions();
+      if (openMenuUi) positionMenu(openMenuUi);
+    };
+    on(doc, "scroll", reflow, { capture: true, passive: true });
+    on(view, "resize", reflow);
     return { active: true, reason: detection.reason };
   }
 
@@ -1808,7 +1884,7 @@ startApp({
   chrome,
   window,
   document,
-  build: "a64640d6cc12"
+  build: "5aac1652e615"
 }).catch((error) => {
   const name = error && typeof error.name === "string" ? error.name : "Error";
   console.error("[Dot Copy Paste]", name);

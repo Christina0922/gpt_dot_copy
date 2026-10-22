@@ -1,3 +1,45 @@
+/* Colors follow ChatGPT's own theme class on <html>, falling back to the system setting. */
+.dcp-anchor,
+.dcp-copy-slot,
+.dcp-menu {
+  --dcp-bg: #ffffff;
+  --dcp-fg: #0f172a;
+  --dcp-border: #cbd5e1;
+  --dcp-hover: #f1f5f9;
+  --dcp-focus: #0f766e;
+  --dcp-success: #065f46;
+  --dcp-error: #991b1b;
+  --dcp-shadow: rgba(15, 23, 42, 0.18);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) .dcp-anchor,
+  :root:not(.light) .dcp-copy-slot,
+  :root:not(.light) .dcp-menu {
+    --dcp-bg: #1f2937;
+    --dcp-fg: #f8fafc;
+    --dcp-border: #4b5563;
+    --dcp-hover: #374151;
+    --dcp-focus: #5eead4;
+    --dcp-success: #99f6e4;
+    --dcp-error: #fecaca;
+    --dcp-shadow: rgba(0, 0, 0, 0.5);
+  }
+}
+
+:root.dark .dcp-anchor,
+:root.dark .dcp-copy-slot,
+:root.dark .dcp-menu {
+  --dcp-bg: #1f2937;
+  --dcp-fg: #f8fafc;
+  --dcp-border: #4b5563;
+  --dcp-hover: #374151;
+  --dcp-focus: #5eead4;
+  --dcp-success: #99f6e4;
+  --dcp-error: #fecaca;
+  --dcp-shadow: rgba(0, 0, 0, 0.5);
+}
+
 .dcp-anchor {
   position: fixed;
   z-index: 2147483000;
@@ -25,9 +67,12 @@
   position: relative;
 }
 
+/* The pair never shrinks or breaks; when the line is too short the whole slot moves to the next line. */
 .dcp-split {
   display: inline-flex;
+  flex: none;
   align-items: stretch;
+  white-space: nowrap;
 }
 
 .dcp-split .dcp-btn-main {
@@ -42,19 +87,24 @@
   padding-inline: 0.4rem;
 }
 
+/* While open the menu is a child of <body>, placed by the controller in viewport coordinates. */
 .dcp-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  inset-inline-start: 0;
-  z-index: 2147483001;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 2147483600;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
   min-width: 10rem;
+  margin: 0;
   padding: 0.25rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--dcp-border);
   border-radius: 8px;
-  background: #ffffff;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
+  background-color: var(--dcp-bg);
+  opacity: 1;
+  isolation: isolate;
+  box-shadow: 0 4px 12px var(--dcp-shadow);
   pointer-events: auto;
 }
 
@@ -67,7 +117,7 @@
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: #0f172a;
+  color: var(--dcp-fg);
   font: 500 0.75rem/1.3 system-ui, sans-serif;
   padding: 0.4rem 0.55rem;
   text-align: start;
@@ -85,8 +135,8 @@
 
 .dcp-menu-item:hover,
 .dcp-menu-item:focus {
-  background: #f1f5f9;
-  outline: 2px solid #0f766e;
+  background: var(--dcp-hover);
+  outline: 2px solid var(--dcp-focus);
   outline-offset: -2px;
 }
 
@@ -100,22 +150,23 @@
 .dcp-btn {
   pointer-events: auto;
   margin: 0;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--dcp-border);
   border-radius: 999px;
-  background: #ffffff;
-  color: #0f172a;
+  background: var(--dcp-bg);
+  color: var(--dcp-fg);
   font: 600 0.75rem/1.3 system-ui, sans-serif;
   padding: 0.25rem 0.6rem;
   min-height: 1.75rem;
-  max-width: 100%;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  flex: none;
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
   text-align: center;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.16);
+  box-shadow: 0 1px 2px var(--dcp-shadow);
 }
 
 .dcp-btn:focus {
-  outline: 2px solid #0f766e;
+  outline: 2px solid var(--dcp-focus);
   outline-offset: 2px;
 }
 
@@ -130,8 +181,8 @@
   margin: 0;
   max-width: min(16rem, 100%);
   border-radius: 8px;
-  background: #ffffff;
-  color: #0f172a;
+  background: var(--dcp-bg);
+  color: var(--dcp-fg);
   font: 400 0.75rem/1.35 system-ui, sans-serif;
   padding: 0;
 }
@@ -142,49 +193,13 @@
 
 .dcp-status:not(:empty) {
   padding: 0.3rem 0.45rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--dcp-border);
 }
 
 .dcp-status[data-dcp-state="success"] {
-  color: #065f46;
+  color: var(--dcp-success);
 }
 
 .dcp-status[data-dcp-state="error"] {
-  color: #991b1b;
-}
-
-@media (prefers-color-scheme: dark) {
-  .dcp-btn,
-  .dcp-status {
-    background: #1f2937;
-    color: #f8fafc;
-    border-color: #4b5563;
-  }
-
-  .dcp-btn:focus {
-    outline-color: #5eead4;
-  }
-
-  .dcp-menu {
-    background: #1f2937;
-    border-color: #4b5563;
-  }
-
-  .dcp-menu-item {
-    color: #f8fafc;
-  }
-
-  .dcp-menu-item:hover,
-  .dcp-menu-item:focus {
-    background: #374151;
-    outline-color: #5eead4;
-  }
-
-  .dcp-status[data-dcp-state="success"] {
-    color: #99f6e4;
-  }
-
-  .dcp-status[data-dcp-state="error"] {
-    color: #fecaca;
-  }
+  color: var(--dcp-error);
 }

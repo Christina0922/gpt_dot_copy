@@ -90,6 +90,11 @@ export const liveAdapter = {
     if (!element) return null;
     return { kind: "contenteditable", element };
   },
+  // The whole composer block; an open menu must not extend under it.
+  getComposerArea(doc) {
+    if (typeof doc?.querySelector !== "function") return null;
+    return doc.querySelector("[data-role='composer']");
+  },
   composerHasDraft(element) {
     const send = findSendButton(element?.closest?.("[data-role='composer']"));
     if (!send) return null;

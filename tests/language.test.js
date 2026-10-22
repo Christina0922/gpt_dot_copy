@@ -84,7 +84,9 @@ test("page buttons, the format menu, and status text follow the same rule on a K
   const known = doc.querySelector("[data-fixture-id='m1'] .dcp-copy-slot");
   const unknown = doc.querySelector("[data-fixture-id='m5'] [data-dcp-copy]");
   assert.equal(known.querySelector("[data-dcp-copy]").textContent, MESSAGES.en.copy);
-  assert.equal(unknown.textContent, MESSAGES.en.copyShown);
+  assert.equal(unknown.textContent, MESSAGES.en.copy);
+  assert.equal(unknown.getAttribute("aria-label"), MESSAGES.en.copyShown);
+  assert.equal(unknown.title, MESSAGES.en.copyShown);
   assert.equal(known.querySelector("[data-dcp-copy-menu]").getAttribute("aria-label"), MESSAGES.en.copyFormatMenu);
   assert.deepEqual([...known.querySelectorAll("[role='menuitemradio']")].map((item) => item.textContent), [MESSAGES.en.copyAsText, MESSAGES.en.copyAsMarkdown]);
   assert.equal(doc.querySelector("[data-dcp-paste]").textContent, MESSAGES.en.paste);
@@ -94,12 +96,14 @@ test("page buttons, the format menu, and status text follow the same rule on a K
 
   const legacy = await pageWith({ language: "ko" });
   assert.equal(legacy.querySelector("[data-fixture-id='m1'] [data-dcp-copy]").textContent, MESSAGES.en.copy);
-  assert.equal(legacy.querySelector("[data-fixture-id='m5'] [data-dcp-copy]").textContent, MESSAGES.en.copyShown);
+  assert.equal(legacy.querySelector("[data-fixture-id='m5'] [data-dcp-copy]").getAttribute("aria-label"), MESSAGES.en.copyShown);
 
   const korean = await pageWith({ language: "ko", languageChosen: true });
   const slot = korean.querySelector("[data-fixture-id='m1'] .dcp-copy-slot");
   assert.equal(slot.querySelector("[data-dcp-copy]").textContent, MESSAGES.ko.copy);
-  assert.equal(korean.querySelector("[data-fixture-id='m5'] [data-dcp-copy]").textContent, MESSAGES.ko.copyShown);
+  assert.equal(korean.querySelector("[data-fixture-id='m5'] [data-dcp-copy]").textContent, MESSAGES.ko.copy);
+  assert.equal(korean.querySelector("[data-fixture-id='m5'] [data-dcp-copy]").getAttribute("aria-label"), MESSAGES.ko.copyShown);
+  assert.equal(korean.querySelector("[data-fixture-id='m5'] [data-dcp-copy]").title, MESSAGES.ko.copyShown);
   assert.equal(slot.querySelector("[data-dcp-copy-menu]").getAttribute("aria-label"), MESSAGES.ko.copyFormatMenu);
   assert.deepEqual([...slot.querySelectorAll("[role='menuitemradio']")].map((item) => item.textContent), [MESSAGES.ko.copyAsText, MESSAGES.ko.copyAsMarkdown]);
 });

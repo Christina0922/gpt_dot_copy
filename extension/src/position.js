@@ -37,3 +37,18 @@ export function computeAnchorPosition({ anchor, width, height, viewportWidth, vi
   const top = clamp(preferred, 8, Math.max(8, viewportHeight - height - 8));
   return { hidden: false, top, left };
 }
+
+// Places an open menu beside its trigger inside the visible area (`bounds`: the part of the message
+// list not covered by the composer). Opens downward when it fits, upward when only that fits, and
+// otherwise toward the side with more room.
+export function computeMenuPosition({ trigger, width, height, bounds, viewportWidth, viewportHeight, gap = 4, margin = 8 }) {
+  if (!trigger || trigger.bottom <= bounds.top || trigger.top >= bounds.bottom) return { hidden: true };
+  const spaceBelow = bounds.bottom - trigger.bottom - gap;
+  const spaceAbove = trigger.top - bounds.top - gap;
+  let placement = "below";
+  if (spaceBelow < height) placement = spaceAbove >= height || spaceAbove > spaceBelow ? "above" : "below";
+  const preferred = placement === "below" ? trigger.bottom + gap : trigger.top - gap - height;
+  const top = clamp(preferred, margin, Math.max(margin, viewportHeight - height - margin));
+  const left = clamp(trigger.left, margin, Math.max(margin, viewportWidth - width - margin));
+  return { hidden: false, placement, top, left };
+}

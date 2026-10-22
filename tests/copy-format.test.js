@@ -94,7 +94,8 @@ test("main click copies plain text by default, and the menu copies Markdown", as
 
   // Every copy button now shows and uses the remembered format.
   assert.equal(slot(doc, "m1").querySelector("[data-dcp-copy]").textContent, MESSAGES.ko.copyMarkdown);
-  assert.equal(slot(doc, "m5").querySelector("[data-dcp-copy]").textContent, MESSAGES.ko.copyShownMarkdown);
+  assert.equal(slot(doc, "m5").querySelector("[data-dcp-copy]").textContent, MESSAGES.ko.copyMarkdown);
+  assert.equal(slot(doc, "m5").querySelector("[data-dcp-copy]").getAttribute("aria-label"), MESSAGES.ko.copyShownMarkdown);
   assert.equal(items[1].getAttribute("aria-checked"), "true");
   main.click();
   await flush();
@@ -158,8 +159,9 @@ test("the page remembers the menu choice, and a format change does not rebuild t
   const clipboard = createClipboard();
   await startApp({ chrome, window: dom.window, document: doc, adapter: createFixtureAdapter(doc), clipboard });
   const before = slot(doc, "m2");
+  const beforeMenu = before.querySelector("[role='menu']");
   before.querySelector("[data-dcp-copy-menu]").click();
-  before.querySelectorAll("[role='menuitemradio']")[1].click();
+  beforeMenu.querySelectorAll("[role='menuitemradio']")[1].click();
   await flush();
   assert.equal(chrome.state.settings.copyFormat, "markdown");
   chrome.emit(chrome.state.settings);
