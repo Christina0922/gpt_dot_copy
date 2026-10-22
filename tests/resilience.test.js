@@ -20,7 +20,10 @@ function captureErrors(t) {
   const logged = [];
   const originals = { error: console.error, warn: console.warn };
   console.error = (...args) => logged.push(args);
-  console.warn = (...args) => logged.push(args);
+  // These pages have no action row, so the one-time "fallback" line is expected and checked elsewhere.
+  console.warn = (...args) => {
+    if (args[1] !== "fallback") logged.push(args);
+  };
   t.after(() => Object.assign(console, originals));
   return logged;
 }

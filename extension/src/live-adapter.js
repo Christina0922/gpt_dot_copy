@@ -82,6 +82,11 @@ export const liveAdapter = {
     const element = node?.nodeType === 1 ? node : node?.parentElement;
     return element?.closest?.("article[data-message-id]") || null;
   },
+  // The row holding the reply and reaction buttons, outside the bubble.
+  getActionsElement(message) {
+    if (!message || typeof message.querySelector !== "function") return null;
+    return message.querySelector(".message-inline-actions");
+  },
   getBodyElement(message) {
     if (!message || typeof message.querySelector !== "function") return null;
     return message.querySelector("[data-markdown-text-style]");

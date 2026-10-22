@@ -968,6 +968,11 @@ const liveAdapter = {
     const element = node?.nodeType === 1 ? node : node?.parentElement;
     return element?.closest?.("article[data-message-id]") || null;
   },
+  // The row holding the reply and reaction buttons, outside the bubble.
+  getActionsElement(message) {
+    if (!message || typeof message.querySelector !== "function") return null;
+    return message.querySelector(".message-inline-actions");
+  },
   getBodyElement(message) {
     if (!message || typeof message.querySelector !== "function") return null;
     return message.querySelector("[data-markdown-text-style]");
@@ -1066,6 +1071,7 @@ function createController({
   let waitingForRoot = false;
   let stopped = true;
   let scanCount = 0;
+  let fallbackLogged = false;
   let queued = false;
   let queue = [];
   let halted = false;
@@ -1186,7 +1192,44 @@ function createController({
   }
 
   // The icon row is always the last child of the message body, on its own line inside the bubble.
-  function placeCopySlot(wrap, body) {
+  // Takes the size of the page's own action buttons (reply, reaction) so the icons line up with them.
+  function matchActionButtonSize(ui, actions) {
+    if (ui.sized) return;
+    const reference = [...actions.querySelectorAll("button")].find((button) => !button.closest("[data-dcp-ui]") && button.offsetWidth > 0);
+    if (!reference) return;
+    ui.sized = true;
+    for (const button of Object.values(ui.buttons)) {
+      button.style.width = `${reference.offsetWidth}px`;
+      button.style.height = `${reference.offsetHeight}px`;
+    }
+  }
+
+  // Outside the bubble, in the message's action row next to reply and reaction: after them for Dot,
+  // before them for the user. Without that row, the icons fall back to the last line inside the bubble.
+  function placeCopySlot(ui, message) {
+    const { wrap } = ui;
+    const actions = typeof adapter.getActionsElement === "function" ? adapter.getActionsElement(message) : null;
+    if (actions) {
+      if (wrap.dataset.dcpMode !== "actions") wrap.dataset.dcpMode = "actions";
+      const user = wrap.dataset.dcpAuthor === "user";
+      const inPlace = wrap.parentElement === actions && (user ? actions.firstElementChild : actions.lastElementChild) === wrap;
+      if (!inPlace) {
+        if (user) actions.prepend(wrap);
+        else actions.append(wrap);
+        uiWrites += 1;
+      }
+      matchActionButtonSize(ui, actions);
+      return;
+    }
+    const body = adapter.getBodyElement(message);
+    if (!body) return;
+    if (wrap.dataset.dcpMode !== "inline") {
+      wrap.dataset.dcpMode = "inline";
+      if (!fallbackLogged) {
+        fallbackLogged = true;
+        console.warn("[Dot Copy Paste]", "fallback", { reason: "message-actions-missing", placement: "inside-bubble", messageId: clip(message.getAttribute?.("data-message-id") || "", 64) || null });
+      }
+    }
     if (wrap.parentElement === body && body.lastElementChild === wrap) return;
     body.append(wrap);
     uiWrites += 1;
@@ -1200,8 +1243,7 @@ function createController({
           copyUi.delete(message);
           return;
         }
-        const body = adapter.getBodyElement(message);
-        if (body) placeCopySlot(ui.wrap, body);
+        placeCopySlot(ui, message);
       });
     }
     guard("paste-position", null, () => {
@@ -1233,7 +1275,8 @@ function createController({
       const text = busy ? t("copyBusy") : t(label);
       button.disabled = busy;
       button.setAttribute("aria-label", text);
-      button.title = text;
+      // While the warning icon shows, its tooltip carries the failure message.
+      button.title = !busy && button.dataset.dcpResult === "error" ? t("copyFailed") : text;
     }
   }
 
@@ -1244,10 +1287,12 @@ function createController({
     if (button._timer) view.clearTimeout(button._timer);
     showIcon(button, ok ? "check" : "warning");
     button.dataset.dcpResult = ok ? "success" : "error";
+    applyCopyLabel(ui, adapter.getGenerationState(ui.message));
     button._timer = view.setTimeout(() => {
       button._timer = null;
       showIcon(button, icon);
       delete button.dataset.dcpResult;
+      applyCopyLabel(ui, adapter.getGenerationState(ui.message));
     }, ok ? RESULT_ICON_MS : RESULT_ICON_MS * 2);
   }
 
@@ -1281,7 +1326,7 @@ function createController({
     status.setAttribute("role", "status");
     status.setAttribute("aria-live", "polite");
     wrap.append(status);
-    const ui = { wrap, buttons, status };
+    const ui = { message, wrap, buttons, status, sized: false };
     for (const { format } of COPY_FORMATS) {
       buttons[format].addEventListener("click", (event) => {
         event.preventDefault();
@@ -1308,10 +1353,9 @@ function createController({
       ui = createCopyUi(message);
       copyUi.set(message, ui);
     }
-    const body = adapter.getBodyElement(message);
-    if (body) placeCopySlot(ui.wrap, body);
     const author = typeof adapter.getAuthor === "function" ? adapter.getAuthor(message) : "unknown";
     if (ui.wrap.dataset.dcpAuthor !== author) ui.wrap.dataset.dcpAuthor = author;
+    placeCopySlot(ui, message);
     applyCopyLabel(ui, adapter.getGenerationState(message));
   }
 
@@ -1726,7 +1770,7 @@ startApp({
   chrome,
   window,
   document,
-  build: "f106fc3d9e66"
+  build: "9ffe94180566"
 }).catch((error) => {
   const name = error && typeof error.name === "string" ? error.name : "Error";
   console.error("[Dot Copy Paste]", name);

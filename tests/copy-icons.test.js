@@ -5,6 +5,8 @@ import { JSDOM } from "jsdom";
 import { createController } from "../extension/src/controller.js";
 import { liveAdapter } from "../extension/src/live-adapter.js";
 import { createIcon } from "../extension/src/icons.js";
+import { extractPlainText } from "../extension/src/extract-text.js";
+import { extractMarkdown } from "../extension/src/extract-markdown.js";
 import { wirePopup } from "../extension/src/popup-controller.js";
 import { normalizeSettings } from "../extension/src/settings.js";
 import { MESSAGES } from "../extension/src/i18n.js";
@@ -127,31 +129,145 @@ test("icons are inline SVG drawn from paths, with no files, fonts, or text nodes
   assert.ok(createIcon(window.document, "copy-md").innerHTML.startsWith(plain), "the MD icon is the copy icon plus letters");
 });
 
-test("on the saved Dot structure the icons sit last in the bubble body: right for the user, left for Dot", () => {
+function mountDot(t, edit = (doc) => doc, clipboard = createClipboard()) {
   const dom = loadDom(dotFixture, "https://chatgpt.com/dots/home");
   const doc = dom.window.document;
-  createController({ adapter: liveAdapter, document: doc, window: dom.window, clipboard: createClipboard(), getLanguage: () => "en" }).start();
+  doc.hasFocus = () => true;
+  edit(doc, dom);
+  const warnings = [];
+  const original = console.warn;
+  console.warn = (...args) => warnings.push(args);
+  t.after(() => {
+    console.warn = original;
+  });
+  createController({ adapter: liveAdapter, document: doc, window: dom.window, clipboard, getLanguage: () => "en" }).start();
+  return { dom, doc, clipboard, warnings };
+}
+
+const copyRows = (doc) => [...doc.querySelectorAll("article")].filter((row) => row.querySelector(".dcp-copy-slot"));
+
+test("on the saved Dot page the icons sit in the action row outside the bubble: after reply/reaction for Dot, before them for the user", (t) => {
+  const { doc, warnings } = mountDot(t);
   const authors = new Set();
-  for (const row of doc.querySelectorAll("article")) {
+  for (const row of copyRows(doc)) {
     const found = row.querySelector(".dcp-copy-slot");
-    if (!found) continue;
-    assert.equal(found.tagName, "DIV");
-    assert.equal(found.parentElement, liveAdapter.getBodyElement(row));
-    assert.equal(found.parentElement.lastElementChild, found);
-    assert.equal(found.dataset.dcpAuthor, liveAdapter.getAuthor(row));
-    authors.add(found.dataset.dcpAuthor);
+    const actions = row.querySelector(".message-inline-actions");
+    assert.equal(found.parentElement, actions);
+    assert.equal(found.dataset.dcpMode, "actions");
+    assert.equal(row.querySelector(".message-bubble").contains(found), false);
+    const author = liveAdapter.getAuthor(row);
+    assert.equal(found.dataset.dcpAuthor, author);
+    assert.equal(author === "user" ? actions.firstElementChild : actions.lastElementChild, found);
+    authors.add(author);
   }
   assert.deepEqual([...authors].sort(), ["dot", "user"]);
+  assert.equal(warnings.length, 0);
 });
 
-test("the icon row is its own line with the same gap everywhere, and user rows align right", () => {
-  const slotRule = css.match(/\n\.dcp-copy-slot \{([^}]*)\}/g).join("\n");
-  assert.match(slotRule, /display: flex/);
-  assert.match(slotRule, /margin: 6px 0 0/);
-  assert.match(css, /\.dcp-copy-slot\[data-dcp-author="user"\] \{\s*justify-content: flex-end;/);
+test("the bubbles are left exactly as they were", (t) => {
+  let before = [];
+  const { doc } = mountDot(t, (page) => {
+    before = [...page.querySelectorAll(".message-bubble")].map((bubble) => bubble.outerHTML);
+  });
+  assert.ok(copyRows(doc).length > 0);
+  assert.deepEqual([...doc.querySelectorAll(".message-bubble")].map((bubble) => bubble.outerHTML), before);
+});
+
+test("copied text and Markdown contain nothing from the icons", async (t) => {
+  let expected = [];
+  const { doc, clipboard } = mountDot(t, (page) => {
+    expected = [...page.querySelectorAll("article")].map((row) => {
+      const body = liveAdapter.getBodyElement(row);
+      return body ? [extractPlainText(body), extractMarkdown(body)] : null;
+    });
+  });
+  const rows = [...doc.querySelectorAll("article")];
+  for (const row of copyRows(doc)) {
+    const [text, markdown] = expected[rows.indexOf(row)];
+    row.querySelector("[data-dcp-copy='text']").click();
+    await flush();
+    assert.equal(clipboard.calls.at(-1)[1], text);
+    row.querySelector("[data-dcp-copy='markdown']").click();
+    await flush();
+    assert.equal(clipboard.calls.at(-1)[1], markdown);
+  }
+});
+
+test("a message without an action row falls back to the last line in the bubble, with one warning", (t) => {
+  const { doc, warnings } = mountDot(t, (page) => {
+    page.querySelectorAll(".message-inline-actions").forEach((actions, index) => {
+      if (index < 2) actions.remove();
+    });
+  });
+  const fallen = copyRows(doc).filter((row) => !row.querySelector(".message-inline-actions"));
+  assert.equal(fallen.length, 2);
+  for (const row of fallen) {
+    const found = row.querySelector(".dcp-copy-slot");
+    assert.equal(found.dataset.dcpMode, "inline");
+    assert.equal(found.parentElement, liveAdapter.getBodyElement(row));
+    assert.equal(found.parentElement.lastElementChild, found);
+  }
+  const fallbacks = warnings.filter((args) => args[1] === "fallback");
+  assert.equal(fallbacks.length, 1);
+  assert.equal(fallbacks[0][2].reason, "message-actions-missing");
+  assert.equal(JSON.stringify(fallbacks).includes("가짜"), false);
+});
+
+test("the icons take the size of the page's reply and reaction buttons", (t) => {
+  const { doc } = mountDot(t, (page, dom) => {
+    Object.defineProperty(dom.window.HTMLElement.prototype, "offsetWidth", {
+      configurable: true,
+      get() {
+        return this.hasAttribute("data-action") ? 32 : 0;
+      }
+    });
+    Object.defineProperty(dom.window.HTMLElement.prototype, "offsetHeight", {
+      configurable: true,
+      get() {
+        return this.hasAttribute("data-action") ? 30 : 0;
+      }
+    });
+  });
+  for (const button of doc.querySelectorAll("[data-dcp-copy]")) {
+    assert.equal(button.style.width, "32px");
+    assert.equal(button.style.height, "30px");
+  }
+});
+
+test("the warning icon's tooltip gives the failure message, then the label returns", async (t) => {
+  const clipboard = createClipboard();
+  clipboard.state.writeError = "NotAllowedError";
+  const held = [];
+  const { doc } = mountDot(t, (page, dom) => {
+    page.execCommand = () => false;
+    dom.window.setTimeout = (callback, delay) => held.push({ callback, delay });
+  }, clipboard);
+  const button = copyRows(doc)[0].querySelector("[data-dcp-copy='text']");
+  button.click();
+  await flush();
+  assert.equal(icon(button), "warning");
+  assert.equal(button.title, MESSAGES.en.copyFailed);
+  assert.equal(button.getAttribute("aria-label"), MESSAGES.en.copyAsText);
+  held.find((timer) => timer.delay >= 1000).callback();
+  assert.equal(icon(button), "copy");
+  assert.equal(button.title, MESSAGES.en.copyAsText);
+});
+
+test("in the action row the icons hide until hover or focus, show on touch, and have no box", () => {
+  assert.match(css, /\n\.dcp-copy-slot\[data-dcp-mode="actions"\] \{[^}]*visibility: visible;[^}]*opacity: 0;/);
+  assert.match(css, /article:hover \.dcp-copy-slot\[data-dcp-mode="actions"\],\s*\.dcp-copy-slot\[data-dcp-mode="actions"\]:focus-within \{\s*opacity: 1;/);
+  assert.match(css, /@media \(hover: none\) \{\s*\.dcp-copy-slot\[data-dcp-mode="actions"\] \{\s*opacity: 1;/);
+  assert.match(css, /\.dcp-icon-btn \{[^}]*border: 0;[^}]*background: transparent;[^}]*color: var\(--dcp-icon\);/);
+  assert.match(css, /--dcp-icon: var\(--text-secondary/);
   assert.match(css, /\.dcp-icon \{[^}]*width: 16px/);
   assert.match(css, /:root\.dark \.dcp-copy-slot/);
-  assert.doesNotMatch(css, /dcp-menu|dcp-split/);
+  assert.doesNotMatch(css, /dcp-menu|dcp-split|accent/);
+});
+
+test("the bubble fallback keeps its own line with the same gap, user icons on the right", () => {
+  const slotRule = css.match(/\n\.dcp-copy-slot \{([^}]*)\}/g).join("\n");
+  assert.match(slotRule, /margin: 6px 0 0/);
+  assert.match(css, /\.dcp-copy-slot\[data-dcp-author="user"\] \{\s*justify-content: flex-end;/);
 });
 
 test("the copy format is no longer a setting, and the popup has no format control", async () => {

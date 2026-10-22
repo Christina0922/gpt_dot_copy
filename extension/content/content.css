@@ -6,11 +6,13 @@
   --dcp-border: #cbd5e1;
   --dcp-hover: #f1f5f9;
   --dcp-focus: #0f766e;
-  --dcp-accent: #0f766e;
-  --dcp-accent-border: rgba(15, 118, 110, 0.35);
   --dcp-success: #065f46;
   --dcp-error: #991b1b;
   --dcp-shadow: rgba(15, 23, 42, 0.18);
+  /* The copy icons borrow ChatGPT's own text tokens, so they match the reply and reaction icons. */
+  --dcp-icon: var(--text-secondary, #5d5d5d);
+  --dcp-icon-hover: var(--text-primary, #0d0d0d);
+  --dcp-icon-hover-bg: rgba(0, 0, 0, 0.06);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -21,13 +23,12 @@
     --dcp-border: #4b5563;
     --dcp-hover: #374151;
     --dcp-focus: #5eead4;
-  --dcp-accent: #5eead4;
-  --dcp-accent-border: rgba(94, 234, 212, 0.35);
-    --dcp-accent: #5eead4;
-    --dcp-accent-border: rgba(94, 234, 212, 0.35);
     --dcp-success: #99f6e4;
     --dcp-error: #fecaca;
     --dcp-shadow: rgba(0, 0, 0, 0.5);
+    --dcp-icon: var(--text-secondary, #b4b4b4);
+    --dcp-icon-hover: var(--text-primary, #ececec);
+    --dcp-icon-hover-bg: rgba(255, 255, 255, 0.1);
   }
 }
 
@@ -38,11 +39,12 @@
   --dcp-border: #4b5563;
   --dcp-hover: #374151;
   --dcp-focus: #5eead4;
-  --dcp-accent: #5eead4;
-  --dcp-accent-border: rgba(94, 234, 212, 0.35);
   --dcp-success: #99f6e4;
   --dcp-error: #fecaca;
   --dcp-shadow: rgba(0, 0, 0, 0.5);
+  --dcp-icon: var(--text-secondary, #b4b4b4);
+  --dcp-icon-hover: var(--text-primary, #ececec);
+  --dcp-icon-hover-bg: rgba(255, 255, 255, 0.1);
 }
 
 .dcp-anchor {
@@ -56,7 +58,7 @@
   pointer-events: none;
 }
 
-/* The copy icons sit on their own row as the last thing in the bubble: left for Dot, right for the user. */
+/* Fallback when a message has no action row: the icons take the last line inside the bubble. */
 .dcp-copy-slot {
   display: flex;
   flex-wrap: wrap;
@@ -74,7 +76,47 @@
   justify-content: flex-end;
 }
 
-/* 16px teal icons in a thin outlined square, unlike ChatGPT's larger gray borderless icons. */
+/* Normal placement: inside the action row beside reply and reaction, outside the bubble.
+   Hidden like those icons until the message is hovered or focused. Opacity (not display or
+   visibility) hides it, so Tab still reaches the buttons, and "visible" keeps them focusable
+   even when the page hides the row with visibility. */
+.dcp-copy-slot[data-dcp-mode="actions"] {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  flex: none;
+  gap: 0;
+  width: auto;
+  margin: 0;
+  visibility: visible;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+article:hover .dcp-copy-slot[data-dcp-mode="actions"],
+.dcp-copy-slot[data-dcp-mode="actions"]:focus-within {
+  opacity: 1;
+}
+
+/* A keyboard user on one of the icons needs the whole row shown, even if the page hides it. */
+:has(> .dcp-copy-slot[data-dcp-mode="actions"]:focus-within) {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* No mouse to hover with: always show the icons (and the row they sit in). */
+@media (hover: none) {
+  .dcp-copy-slot[data-dcp-mode="actions"] {
+    opacity: 1;
+  }
+
+  :has(> .dcp-copy-slot[data-dcp-mode="actions"]) {
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+}
+
+/* Plain gray icons without a box, like the page's reply and reaction icons; the controller copies
+   their button size when it can, and 28px is the fallback. */
 .dcp-icon-btn {
   pointer-events: auto;
   display: inline-flex;
@@ -82,24 +124,26 @@
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   margin: 0;
   padding: 0;
-  border: 1px solid var(--dcp-accent-border);
-  border-radius: 6px;
+  border: 0;
+  border-radius: 8px;
   background: transparent;
-  color: var(--dcp-accent);
+  color: var(--dcp-icon);
   cursor: pointer;
 }
 
 .dcp-icon-btn:hover {
-  background: var(--dcp-hover);
+  color: var(--dcp-icon-hover);
+  background: var(--dcp-icon-hover-bg);
 }
 
 .dcp-icon-btn:focus-visible {
+  color: var(--dcp-icon-hover);
   outline: 2px solid var(--dcp-focus);
-  outline-offset: 1px;
+  outline-offset: -2px;
 }
 
 .dcp-icon-btn:disabled {
@@ -122,12 +166,15 @@
   height: 16px;
 }
 
-/* A failure message gets its own line under the icons; "Copied" is only announced, since the icon shows it. */
+/* In the bubble fallback a failure message gets its own line under the icons. In the action row
+   it would crowd the reply and reaction icons, so there it is only announced, and the warning
+   icon's tooltip carries it. "Copied" is only announced in both, since the check shows it. */
 .dcp-copy-slot .dcp-status {
   flex-basis: 100%;
 }
 
-.dcp-copy-slot .dcp-status[data-dcp-state="success"] {
+.dcp-copy-slot .dcp-status[data-dcp-state="success"],
+.dcp-copy-slot[data-dcp-mode="actions"] .dcp-status {
   position: absolute;
   width: 1px;
   height: 1px;
