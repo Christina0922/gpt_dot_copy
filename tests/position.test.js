@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { computeAnchorPosition, findCopyAnchor } from "../extension/src/position.js";
+import { computeAnchorPosition } from "../extension/src/position.js";
 import { extractPlainText } from "../extension/src/extract-text.js";
 import { loadDom } from "./helpers/dom.js";
 
@@ -44,30 +44,11 @@ test("hides a message that is fully outside the viewport", () => {
   assert.equal(position.hidden, true);
 });
 
-test("a text ending keeps the copy slot in the last paragraph", () => {
-  const { window } = loadDom(`<div id="body"><div><p id="last">마지막 문장</p></div></div>`);
-  const place = findCopyAnchor(window.document.getElementById("body"));
-  assert.equal(place.mode, "inline");
-  assert.equal(place.anchor.id, "last");
-});
-
-test("a list, table, or code ending places the copy slot after that block", () => {
-  const { window } = loadDom(`
-    <div id="list"><p>설명</p><ul id="items"><li>하나</li></ul></div>
-    <div id="code"><p>설명</p><pre id="sample"><code>a</code></pre></div>
-    <div id="table"><table id="grid"><tr><td>칸</td></tr></table></div>
-  `);
-  const doc = window.document;
-  assert.equal(findCopyAnchor(doc.getElementById("list")).anchor.id, "items");
-  assert.equal(findCopyAnchor(doc.getElementById("list")).mode, "below");
-  assert.equal(findCopyAnchor(doc.getElementById("code")).anchor.id, "sample");
-  assert.equal(findCopyAnchor(doc.getElementById("table")).anchor.id, "grid");
-});
-
 test("the copy slot is not part of the copied text", () => {
   const { window } = loadDom(`
     <div id="body">
-      <p>본문 문장<span data-dcp-ui class="dcp-copy-slot"><button type="button">복사</button><span class="dcp-status">복사됨</span></span></p>
+      <p>본문 문장</p>
+      <div data-dcp-ui class="dcp-copy-slot"><button type="button" aria-label="텍스트로 복사"></button><span class="dcp-status">복사됨</span></div>
     </div>
   `);
   const text = extractPlainText(window.document.getElementById("body"));

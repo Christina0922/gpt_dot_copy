@@ -2,7 +2,8 @@ import { extractPlainText, hasCopyableText } from "./extract-text.js";
 import { extractMarkdown } from "./extract-markdown.js";
 import { insertPlainText, isEditorEmpty, readContentEditableCaret, readTextareaCaret } from "./insert-text.js";
 import { readPlainText, writePlainText } from "./clipboard.js";
-import { computeAnchorPosition, computeMenuPosition, findCopyAnchor } from "./position.js";
+import { computeAnchorPosition } from "./position.js";
+import { createIcon } from "./icons.js";
 import { createTranslator } from "./i18n.js";
 
 function relevantElement(node) {
@@ -35,8 +36,6 @@ export function createController({
   window: view,
   clipboard,
   getLanguage,
-  getCopyFormat = () => "text",
-  setCopyFormat = () => {},
   schedule = (callback) => {
     const raf = view.requestAnimationFrame;
     if (typeof raf !== "function") {
@@ -57,7 +56,6 @@ export function createController({
 }) {
   const copyUi = new Map();
   let pasteUi = null;
-  let openMenuUi = null;
   let savedCaret = null;
   let observer = null;
   let rootWatcher = null;
@@ -184,28 +182,17 @@ export function createController({
     wrap.style.left = `${position.left}px`;
   }
 
+  // The icon row is always the last child of the message body, on its own line inside the bubble.
   function placeCopySlot(wrap, body) {
-    const place = findCopyAnchor(body);
-    if (!place?.anchor?.isConnected) return;
-    wrap.dataset.dcpPlacement = place.mode === "below" ? "below" : "inline";
-    if (place.mode === "below") {
-      if (place.anchor.nextElementSibling !== wrap) {
-        place.anchor.insertAdjacentElement("afterend", wrap);
-        uiWrites += 1;
-      }
-      return;
-    }
-    if (wrap.parentElement !== place.anchor || place.anchor.lastElementChild !== wrap) {
-      place.anchor.append(wrap);
-      uiWrites += 1;
-    }
+    if (wrap.parentElement === body && body.lastElementChild === wrap) return;
+    body.append(wrap);
+    uiWrites += 1;
   }
 
   function updatePositions() {
     for (const [message, ui] of copyUi) {
       guard("position", message, () => {
         if (!message.isConnected) {
-          if (openMenuUi === ui) closeMenu(ui, false);
           ui.wrap.remove();
           copyUi.delete(message);
           return;
@@ -224,200 +211,79 @@ export function createController({
     });
   }
 
-  function currentFormat() {
-    return getCopyFormat() === "markdown" ? "markdown" : "text";
+  const COPY_FORMATS = [
+    { format: "text", icon: "copy", label: "copyAsText" },
+    { format: "markdown", icon: "copy-md", label: "copyAsMarkdown" }
+  ];
+  const RESULT_ICON_MS = 1500;
+
+  function showIcon(button, name) {
+    if (button.dataset.dcpIcon === name) return;
+    button.dataset.dcpIcon = name;
+    button.replaceChildren(createIcon(doc, name));
   }
 
   function applyCopyLabel(ui, state) {
-    const { button, toggle, items } = ui;
-    const markdown = currentFormat() === "markdown";
-    toggle.textContent = "▾";
-    toggle.setAttribute("aria-label", t("copyFormatMenu"));
-    toggle.title = t("copyFormatMenu");
-    for (const item of items) {
-      item.textContent = t(item.dataset.dcpFormat === "markdown" ? "copyAsMarkdown" : "copyAsText");
-      item.setAttribute("aria-checked", String(item.dataset.dcpFormat === currentFormat()));
+    const busy = state === "generating";
+    for (const { format, label } of COPY_FORMATS) {
+      const button = ui.buttons[format];
+      const text = busy ? t("copyBusy") : t(label);
+      button.disabled = busy;
+      button.setAttribute("aria-label", text);
+      button.title = text;
     }
-    // The visible label stays short for every message; the longer meaning lives in the tooltip and aria-label.
-    button.textContent = t(markdown ? "copyMarkdown" : "copy");
-    if (state === "generating") {
-      button.disabled = true;
-      toggle.disabled = true;
-      button.setAttribute("aria-label", t("copyBusy"));
-      button.title = t("copyBusy");
-      if (openMenuUi === ui) closeMenu(ui, false);
-      return;
-    }
-    button.disabled = false;
-    toggle.disabled = false;
-    const key = state === "unknown" ? (markdown ? "copyShownMarkdown" : "copyShown") : (markdown ? "copyMarkdown" : "copy");
-    button.setAttribute("aria-label", t(key));
-    button.title = t(key);
   }
 
-  function refreshCopyLabels() {
-    for (const [message, ui] of copyUi) applyCopyLabel(ui, adapter.getGenerationState(message));
+  // After a copy the pressed icon shows a check or a warning for a moment, then the copy icon again.
+  function flashResult(ui, format, ok) {
+    const button = ui.buttons[format];
+    const icon = COPY_FORMATS.find((entry) => entry.format === format).icon;
+    if (button._timer) view.clearTimeout(button._timer);
+    showIcon(button, ok ? "check" : "warning");
+    button.dataset.dcpResult = ok ? "success" : "error";
+    button._timer = view.setTimeout(() => {
+      button._timer = null;
+      showIcon(button, icon);
+      delete button.dataset.dcpResult;
+    }, ok ? RESULT_ICON_MS : RESULT_ICON_MS * 2);
   }
 
-  async function onCopy(message, status, format) {
+  async function onCopy(message, ui, format) {
     const state = adapter.getGenerationState(message);
     if (state === "generating") return;
     const body = adapter.getBodyElement(message);
     const text = body ? (format === "markdown" ? extractMarkdown(body) : extractPlainText(body)) : "";
-    if (!text) {
-      setStatus(status, t("copyFailed"), "error");
-      return;
-    }
-    const result = await writePlainText(text, clipboard, doc);
-    setStatus(status, result.ok ? t("copied") : t("copyFailed"), result.ok ? "success" : "error");
-  }
-
-  // The part of the message list that is on screen and not under the composer.
-  function visibleBounds() {
-    const bounds = { top: 0, bottom: view.innerHeight || 768 };
-    const root = adapter.getObserverRoot(doc)?.getBoundingClientRect?.();
-    if (root && root.height > 0) {
-      bounds.top = Math.max(bounds.top, root.top);
-      bounds.bottom = Math.min(bounds.bottom, root.bottom);
-    }
-    const composer = (adapter.getComposerArea?.(doc) || adapter.getComposer(doc)?.element)?.getBoundingClientRect?.();
-    if (composer && composer.height > 0 && composer.top > bounds.top && composer.top < bounds.bottom) bounds.bottom = composer.top;
-    return bounds;
-  }
-
-  function positionMenu(ui) {
-    if (!ui.toggle.isConnected) {
-      closeMenu(ui, false);
-      return;
-    }
-    const split = ui.toggle.parentElement.getBoundingClientRect();
-    // Without layout (no size), the menu keeps its default spot.
-    if (split.width === 0 && split.height === 0) return;
-    const position = computeMenuPosition({
-      trigger: split,
-      width: ui.menu.offsetWidth || 160,
-      height: ui.menu.offsetHeight || 72,
-      bounds: visibleBounds(),
-      viewportWidth: view.innerWidth || 1024,
-      viewportHeight: view.innerHeight || 768
-    });
-    if (position.hidden) {
-      closeMenu(ui, false);
-      return;
-    }
-    ui.menu.dataset.dcpPlacement = position.placement;
-    ui.menu.style.top = `${position.top}px`;
-    ui.menu.style.left = `${position.left}px`;
-  }
-
-  function openMenu(ui) {
-    if (openMenuUi && openMenuUi !== ui) closeMenu(openMenuUi, false);
-    openMenuUi = ui;
-    // While open, the menu sits on <body> so the bubble's stacking and clipping cannot cover it.
-    (doc.body || doc.documentElement).append(ui.menu);
-    ui.menu.hidden = false;
-    ui.toggle.setAttribute("aria-expanded", "true");
-    positionMenu(ui);
-    if (openMenuUi !== ui) return;
-    const checked = ui.items.find((item) => item.dataset.dcpFormat === currentFormat()) || ui.items[0];
-    checked.focus({ preventScroll: true });
-  }
-
-  function closeMenu(ui, returnFocus) {
-    ui.menu.hidden = true;
-    ui.toggle.setAttribute("aria-expanded", "false");
-    if (ui.menu.parentElement !== ui.wrap) ui.wrap.insertBefore(ui.menu, ui.status);
-    if (openMenuUi === ui) openMenuUi = null;
-    if (returnFocus) ui.toggle.focus();
-  }
-
-  function onMenuKey(ui, event) {
-    const index = ui.items.indexOf(doc.activeElement);
-    const move = { ArrowDown: 1, ArrowUp: -1 }[event.key];
-    if (move) {
-      event.preventDefault();
-      ui.items[(index + move + ui.items.length) % ui.items.length].focus();
-      return;
-    }
-    if (event.key === "Home" || event.key === "End") {
-      event.preventDefault();
-      ui.items[event.key === "Home" ? 0 : ui.items.length - 1].focus();
-      return;
-    }
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      closeMenu(ui, true);
-      return;
-    }
-    if (event.key === "Tab") closeMenu(ui, false);
+    const result = text ? await writePlainText(text, clipboard, doc) : { ok: false };
+    flashResult(ui, format, result.ok);
+    setStatus(ui.status, result.ok ? t("copied") : t("copyFailed"), result.ok ? "success" : "error");
   }
 
   function createCopyUi(message) {
-    const wrap = doc.createElement("span");
+    const wrap = doc.createElement("div");
     wrap.setAttribute("data-dcp-ui", "");
     wrap.className = "dcp-copy-slot";
-    const split = doc.createElement("span");
-    split.className = "dcp-split";
-    const button = doc.createElement("button");
-    button.type = "button";
-    button.className = "dcp-btn dcp-btn-main";
-    button.setAttribute("data-dcp-copy", "");
-    const toggle = doc.createElement("button");
-    toggle.type = "button";
-    toggle.className = "dcp-btn dcp-btn-toggle";
-    toggle.setAttribute("data-dcp-copy-menu", "");
-    toggle.setAttribute("aria-haspopup", "menu");
-    toggle.setAttribute("aria-expanded", "false");
-    const menu = doc.createElement("span");
-    menu.setAttribute("data-dcp-ui", "");
-    menu.className = "dcp-menu";
-    menu.setAttribute("role", "menu");
-    menu.hidden = true;
-    const items = ["text", "markdown"].map((format) => {
-      const item = doc.createElement("button");
-      item.type = "button";
-      item.className = "dcp-menu-item";
-      item.setAttribute("role", "menuitemradio");
-      item.dataset.dcpFormat = format;
-      menu.append(item);
-      return item;
-    });
+    const buttons = {};
+    for (const { format, icon } of COPY_FORMATS) {
+      const button = doc.createElement("button");
+      button.type = "button";
+      button.className = "dcp-icon-btn";
+      button.setAttribute("data-dcp-copy", format);
+      showIcon(button, icon);
+      buttons[format] = button;
+      wrap.append(button);
+    }
     const status = doc.createElement("span");
     status.setAttribute("data-dcp-ui", "");
     status.className = "dcp-status";
     status.setAttribute("role", "status");
     status.setAttribute("aria-live", "polite");
-    split.append(button, toggle);
-    wrap.append(split, menu, status);
-    const ui = { wrap, button, toggle, menu, items, status };
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      onCopy(message, status, currentFormat());
-    });
-    toggle.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (openMenuUi === ui) closeMenu(ui, true);
-      else openMenu(ui);
-    });
-    toggle.addEventListener("keydown", (event) => {
-      if (event.key !== "ArrowDown" || openMenuUi === ui) return;
-      event.preventDefault();
-      openMenu(ui);
-    });
-    menu.addEventListener("keydown", (event) => onMenuKey(ui, event));
-    for (const item of items) {
-      item.addEventListener("click", (event) => {
+    wrap.append(status);
+    const ui = { wrap, buttons, status };
+    for (const { format } of COPY_FORMATS) {
+      buttons[format].addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
-        const format = item.dataset.dcpFormat;
-        closeMenu(ui, true);
-        // Copy first so the clipboard write stays inside this click.
-        onCopy(message, status, format);
-        setCopyFormat(format);
-        refreshCopyLabels();
+        onCopy(message, ui, format);
       });
     }
     return ui;
@@ -441,6 +307,8 @@ export function createController({
     }
     const body = adapter.getBodyElement(message);
     if (body) placeCopySlot(ui.wrap, body);
+    const author = typeof adapter.getAuthor === "function" ? adapter.getAuthor(message) : "unknown";
+    if (ui.wrap.dataset.dcpAuthor !== author) ui.wrap.dataset.dcpAuthor = author;
     applyCopyLabel(ui, adapter.getGenerationState(message));
   }
 
@@ -646,15 +514,8 @@ export function createController({
     on(doc, "selectionchange", rememberCaret, true);
     on(doc, "keyup", rememberCaret, true);
     on(doc, "mouseup", rememberCaret, true);
-    on(doc, "pointerdown", (event) => {
-      if (openMenuUi && !openMenuUi.wrap.contains(event.target) && !openMenuUi.menu.contains(event.target)) closeMenu(openMenuUi, false);
-    }, true);
-    const reflow = () => {
-      updatePositions();
-      if (openMenuUi) positionMenu(openMenuUi);
-    };
-    on(doc, "scroll", reflow, { capture: true, passive: true });
-    on(view, "resize", reflow);
+    on(doc, "scroll", () => updatePositions(), { capture: true, passive: true });
+    on(view, "resize", () => updatePositions());
     return { active: true, reason: detection.reason };
   }
 
@@ -669,7 +530,6 @@ export function createController({
     copyUi.clear();
     pasteUi?.wrap.remove();
     pasteUi = null;
-    openMenuUi = null;
     savedCaret = null;
     queue = [];
     queued = false;
@@ -685,7 +545,6 @@ export function createController({
   return {
     start,
     stop,
-    refreshCopyLabels,
     get scanCount() {
       return scanCount;
     },

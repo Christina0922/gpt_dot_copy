@@ -1,12 +1,13 @@
 /* Colors follow ChatGPT's own theme class on <html>, falling back to the system setting. */
 .dcp-anchor,
-.dcp-copy-slot,
-.dcp-menu {
+.dcp-copy-slot {
   --dcp-bg: #ffffff;
   --dcp-fg: #0f172a;
   --dcp-border: #cbd5e1;
   --dcp-hover: #f1f5f9;
   --dcp-focus: #0f766e;
+  --dcp-accent: #0f766e;
+  --dcp-accent-border: rgba(15, 118, 110, 0.35);
   --dcp-success: #065f46;
   --dcp-error: #991b1b;
   --dcp-shadow: rgba(15, 23, 42, 0.18);
@@ -14,13 +15,16 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not(.light) .dcp-anchor,
-  :root:not(.light) .dcp-copy-slot,
-  :root:not(.light) .dcp-menu {
+  :root:not(.light) .dcp-copy-slot {
     --dcp-bg: #1f2937;
     --dcp-fg: #f8fafc;
     --dcp-border: #4b5563;
     --dcp-hover: #374151;
     --dcp-focus: #5eead4;
+  --dcp-accent: #5eead4;
+  --dcp-accent-border: rgba(94, 234, 212, 0.35);
+    --dcp-accent: #5eead4;
+    --dcp-accent-border: rgba(94, 234, 212, 0.35);
     --dcp-success: #99f6e4;
     --dcp-error: #fecaca;
     --dcp-shadow: rgba(0, 0, 0, 0.5);
@@ -28,13 +32,14 @@
 }
 
 :root.dark .dcp-anchor,
-:root.dark .dcp-copy-slot,
-:root.dark .dcp-menu {
+:root.dark .dcp-copy-slot {
   --dcp-bg: #1f2937;
   --dcp-fg: #f8fafc;
   --dcp-border: #4b5563;
   --dcp-hover: #374151;
   --dcp-focus: #5eead4;
+  --dcp-accent: #5eead4;
+  --dcp-accent-border: rgba(94, 234, 212, 0.35);
   --dcp-success: #99f6e4;
   --dcp-error: #fecaca;
   --dcp-shadow: rgba(0, 0, 0, 0.5);
@@ -51,100 +56,86 @@
   pointer-events: none;
 }
 
+/* The copy icons sit on their own row as the last thing in the bubble: left for Dot, right for the user. */
 .dcp-copy-slot {
-  display: inline-flex;
+  display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.35rem;
-  max-width: 100%;
-  margin-inline-start: 0.4rem;
-  vertical-align: baseline;
+  justify-content: flex-start;
+  gap: 4px;
+  width: 100%;
   box-sizing: border-box;
+  margin: 6px 0 0;
+  padding: 0;
   pointer-events: none;
 }
 
-.dcp-copy-slot {
-  position: relative;
+.dcp-copy-slot[data-dcp-author="user"] {
+  justify-content: flex-end;
 }
 
-/* The pair never shrinks or breaks; when the line is too short the whole slot moves to the next line. */
-.dcp-split {
+/* 16px teal icons in a thin outlined square, unlike ChatGPT's larger gray borderless icons. */
+.dcp-icon-btn {
+  pointer-events: auto;
   display: inline-flex;
   flex: none;
-  align-items: stretch;
-  white-space: nowrap;
-}
-
-.dcp-split .dcp-btn-main {
-  border-start-end-radius: 0;
-  border-end-end-radius: 0;
-}
-
-.dcp-split .dcp-btn-toggle {
-  border-start-start-radius: 0;
-  border-end-start-radius: 0;
-  border-inline-start-width: 0;
-  padding-inline: 0.4rem;
-}
-
-/* While open the menu is a child of <body>, placed by the controller in viewport coordinates. */
-.dcp-menu {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 2147483600;
-  display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   box-sizing: border-box;
-  min-width: 10rem;
+  width: 26px;
+  height: 26px;
   margin: 0;
-  padding: 0.25rem;
-  border: 1px solid var(--dcp-border);
-  border-radius: 8px;
-  background-color: var(--dcp-bg);
-  opacity: 1;
-  isolation: isolate;
-  box-shadow: 0 4px 12px var(--dcp-shadow);
-  pointer-events: auto;
-}
-
-.dcp-menu[hidden] {
-  display: none;
-}
-
-.dcp-menu-item {
-  margin: 0;
-  border: 0;
+  padding: 0;
+  border: 1px solid var(--dcp-accent-border);
   border-radius: 6px;
   background: transparent;
-  color: var(--dcp-fg);
-  font: 500 0.75rem/1.3 system-ui, sans-serif;
-  padding: 0.4rem 0.55rem;
-  text-align: start;
-  white-space: nowrap;
+  color: var(--dcp-accent);
   cursor: pointer;
 }
 
-.dcp-menu-item[aria-checked="true"]::before {
-  content: "✓ ";
-}
-
-.dcp-menu-item[aria-checked="false"]::before {
-  content: "\00a0\00a0\00a0";
-}
-
-.dcp-menu-item:hover,
-.dcp-menu-item:focus {
+.dcp-icon-btn:hover {
   background: var(--dcp-hover);
-  outline: 2px solid var(--dcp-focus);
-  outline-offset: -2px;
 }
 
-.dcp-copy-slot[data-dcp-placement="below"] {
-  display: flex;
-  width: fit-content;
-  margin-inline-start: 0;
-  margin-top: 0.35rem;
+.dcp-icon-btn:focus-visible {
+  outline: 2px solid var(--dcp-focus);
+  outline-offset: 1px;
+}
+
+.dcp-icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.dcp-icon-btn[data-dcp-result="success"] {
+  color: var(--dcp-success);
+}
+
+.dcp-icon-btn[data-dcp-result="error"] {
+  color: var(--dcp-error);
+}
+
+.dcp-icon {
+  display: block;
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+/* A failure message gets its own line under the icons; "Copied" is only announced, since the icon shows it. */
+.dcp-copy-slot .dcp-status {
+  flex-basis: 100%;
+}
+
+.dcp-copy-slot .dcp-status[data-dcp-state="success"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  padding: 0;
+  border: 0;
 }
 
 .dcp-btn {

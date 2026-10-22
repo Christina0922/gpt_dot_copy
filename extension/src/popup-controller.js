@@ -9,7 +9,6 @@ export function wirePopup(doc, { chrome, version }) {
     intro: doc.querySelector("[data-i18n='popupIntro']"),
     enabledLabel: doc.querySelector("[data-i18n='enabledLabel']"),
     languageLabel: doc.querySelector("[data-i18n='languageLabel']"),
-    copyFormatLabel: doc.querySelector("[data-i18n='copyFormatLabel']"),
     clipboardHeading: doc.querySelector("[data-i18n='clipboardHeading']"),
     clipboardExplain: doc.querySelector("[data-i18n='clipboardExplain']"),
     allow: doc.querySelector("[data-action='allow-clipboard']"),
@@ -21,8 +20,7 @@ export function wirePopup(doc, { chrome, version }) {
     version: doc.querySelector("[data-role='version']"),
     versionLabel: doc.querySelector("[data-i18n='versionLabel']"),
     enabled: doc.querySelector("[data-setting='enabled']"),
-    language: doc.querySelector("[data-setting='language']"),
-    copyFormat: doc.querySelector("[data-setting='copyFormat']")
+    language: doc.querySelector("[data-setting='language']")
   };
 
   let settings = normalizeSettings(null);
@@ -48,10 +46,6 @@ export function wirePopup(doc, { chrome, version }) {
       if (option.value === "ko") option.textContent = t("languageKo");
       if (option.value === "en") option.textContent = t("languageEn");
     }
-    nodes.copyFormat.value = settings.copyFormat;
-    for (const option of nodes.copyFormat.options) {
-      option.textContent = t(option.value === "markdown" ? "copyFormatMarkdown" : "copyFormatText");
-    }
   }
 
   async function paintPermission() {
@@ -74,18 +68,6 @@ export function wirePopup(doc, { chrome, version }) {
     settings = await saveSettings(storage, { ...settings, language: nodes.language.value, languageChosen: true });
     paint();
     await paintPermission();
-  });
-
-  nodes.copyFormat.addEventListener("change", async () => {
-    settings = await saveSettings(storage, { ...settings, copyFormat: nodes.copyFormat.value });
-    paint();
-  });
-
-  // The page menu also saves the format, so keep an open popup in step with it.
-  chrome.storage.onChanged?.addListener?.((changes, area) => {
-    if (area !== "local" || !changes.settings) return;
-    settings = normalizeSettings(changes.settings.newValue);
-    paint();
   });
 
   nodes.allow.addEventListener("click", async () => {

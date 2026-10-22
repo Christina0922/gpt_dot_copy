@@ -12,6 +12,7 @@ const order = [
   "src/extract-markdown.js",
   "src/insert-text.js",
   "src/clipboard.js",
+  "src/icons.js",
   "src/live-adapter.js",
   "src/controller.js",
   "src/bootstrap.js"

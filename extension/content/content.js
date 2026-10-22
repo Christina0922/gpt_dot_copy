@@ -4,8 +4,7 @@ const { DEFAULT_SETTINGS, normalizeSettings, readStoredSettings, loadSettings, s
 const DEFAULT_SETTINGS = {
   enabled: true,
   language: "en",
-  languageChosen: false,
-  copyFormat: "text"
+  languageChosen: false
 };
 
 function normalizeSettings(value) {
@@ -16,8 +15,7 @@ function normalizeSettings(value) {
   return {
     enabled: source.enabled !== false,
     language,
-    languageChosen,
-    copyFormat: source.copyFormat === "markdown" ? "markdown" : "text"
+    languageChosen
   };
 }
 
@@ -44,17 +42,9 @@ return { DEFAULT_SETTINGS, normalizeSettings, readStoredSettings, loadSettings, 
 const { MESSAGES, resolveLanguage, translate, createTranslator } = (() => {
 const MESSAGES = {
   en: {
-    copy: "Copy",
-    copyShown: "Copy the text currently shown",
     copyBusy: "You can copy after the reply finishes",
-    copyMarkdown: "Copy MD",
-    copyShownMarkdown: "Copy the shown text as Markdown",
-    copyFormatMenu: "Choose copy format",
     copyAsText: "Copy as text",
     copyAsMarkdown: "Copy as Markdown",
-    copyFormatLabel: "Default copy format",
-    copyFormatText: "Text",
-    copyFormatMarkdown: "Markdown",
     paste: "Paste",
     copied: "Copied",
     pasted: "Pasted",
@@ -64,7 +54,7 @@ const MESSAGES = {
     composerMissing: "The input field was not found. Nothing was changed.",
     insertRejected: "The input field did not accept the paste. Nothing was changed.",
     popupTitle: "Dot Copy Paste",
-    popupIntro: "Turns copy and paste buttons on or off, sets the copy format, and shows the version.",
+    popupIntro: "Turns copy and paste buttons on or off and shows the version.",
     enabledLabel: "Use copy and paste buttons",
     languageLabel: "Language",
     languageKo: "Korean",
@@ -82,17 +72,9 @@ const MESSAGES = {
     trademark: "The public product name and trademark review are not finished. Dot Copy Paste is the working name."
   },
   ko: {
-    copy: "복사",
-    copyShown: "현재 표시된 내용 복사",
     copyBusy: "답변이 끝난 뒤 복사할 수 있습니다",
-    copyMarkdown: "MD 복사",
-    copyShownMarkdown: "현재 표시된 내용을 마크다운으로 복사",
-    copyFormatMenu: "복사 형식 선택",
     copyAsText: "텍스트로 복사",
     copyAsMarkdown: "마크다운으로 복사",
-    copyFormatLabel: "기본 복사 형식",
-    copyFormatText: "텍스트",
-    copyFormatMarkdown: "마크다운",
     paste: "붙여넣기",
     copied: "복사됨",
     pasted: "붙여넣음",
@@ -102,7 +84,7 @@ const MESSAGES = {
     composerMissing: "입력창을 찾지 못했습니다. 입력한 내용은 바꾸지 않았습니다.",
     insertRejected: "입력창이 붙여넣기를 받아들이지 않았습니다. 입력한 내용은 바꾸지 않았습니다.",
     popupTitle: "Dot Copy Paste",
-    popupIntro: "복사·붙여넣기 버튼을 켜거나 끄고, 복사 형식을 정하고, 버전을 확인합니다.",
+    popupIntro: "복사·붙여넣기 버튼을 켜거나 끄고, 버전을 확인합니다.",
     enabledLabel: "복사·붙여넣기 버튼 사용",
     languageLabel: "언어",
     languageKo: "한국어",
@@ -138,33 +120,7 @@ function createTranslator(language) {
 return { MESSAGES, resolveLanguage, translate, createTranslator };
 })();
 
-const { findCopyAnchor, computeAnchorPosition, computeMenuPosition } = (() => {
-const BLOCK_END = new Set(["PRE", "TABLE", "UL", "OL", "BLOCKQUOTE"]);
-
-function contentChildren(element) {
-  return [...element.children].filter((child) => {
-    if (child.hasAttribute("data-dcp-ui") || child.hasAttribute("data-dcp-exclude")) return false;
-    if (child.getAttribute("data-markdown-copy") === "exclude") return false;
-    if (child.hasAttribute("hidden") || child.getAttribute("aria-hidden") === "true") return false;
-    return true;
-  });
-}
-
-function findCopyAnchor(body) {
-  if (!body || body.nodeType !== 1) return null;
-  let node = body;
-  while (true) {
-    const children = contentChildren(node);
-    const last = children[children.length - 1];
-    if (!last || last.tagName !== "DIV") break;
-    node = last;
-  }
-  const last = contentChildren(node).at(-1) || null;
-  if (last && BLOCK_END.has(last.tagName)) return { mode: "below", anchor: last };
-  if (last && last.tagName === "P") return { mode: "inline", anchor: last };
-  return { mode: "inline", anchor: node };
-}
-
+const { computeAnchorPosition } = (() => {
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
@@ -179,22 +135,7 @@ function computeAnchorPosition({ anchor, width, height, viewportWidth, viewportH
   return { hidden: false, top, left };
 }
 
-// Places an open menu beside its trigger inside the visible area (`bounds`: the part of the message
-// list not covered by the composer). Opens downward when it fits, upward when only that fits, and
-// otherwise toward the side with more room.
-function computeMenuPosition({ trigger, width, height, bounds, viewportWidth, viewportHeight, gap = 4, margin = 8 }) {
-  if (!trigger || trigger.bottom <= bounds.top || trigger.top >= bounds.bottom) return { hidden: true };
-  const spaceBelow = bounds.bottom - trigger.bottom - gap;
-  const spaceAbove = trigger.top - bounds.top - gap;
-  let placement = "below";
-  if (spaceBelow < height) placement = spaceAbove >= height || spaceAbove > spaceBelow ? "above" : "below";
-  const preferred = placement === "below" ? trigger.bottom + gap : trigger.top - gap - height;
-  const top = clamp(preferred, margin, Math.max(margin, viewportHeight - height - margin));
-  const left = clamp(trigger.left, margin, Math.max(margin, viewportWidth - width - margin));
-  return { hidden: false, placement, top, left };
-}
-
-return { findCopyAnchor, computeAnchorPosition, computeMenuPosition };
+return { computeAnchorPosition };
 })();
 
 const { joinBlocks, PLAIN_FORMAT, extractWithFormat, extractPlainText, hasCopyableText } = (() => {
@@ -892,6 +833,56 @@ async function readPlainText(clipboard, doc) {
 return { legacyCopy, writePlainText, readPlainText };
 })();
 
+const { createIcon } = (() => {
+// Icons are drawn here as inline SVG so the extension loads no icon files or fonts.
+// Lines use the button's text color; the 16px size and teal tint set them apart from ChatGPT's own gray copy icons.
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+const BACK_SHEET = "M9.5 1.5H3A1.5 1.5 0 0 0 1.5 3v6.5";
+const FRONT_SHEET = { x: 4, y: 4, width: 10.5, height: 10.5, rx: 1.5 };
+
+const SHAPES = {
+  copy: [["path", { d: BACK_SHEET }], ["rect", FRONT_SHEET]],
+  // The same two sheets with a small "MD" drawn inside the front one.
+  "copy-md": [
+    ["path", { d: BACK_SHEET }],
+    ["rect", FRONT_SHEET],
+    ["path", { d: "M5.9 11.9V7.1l1.5 2.3 1.5-2.3v4.8", "stroke-width": "1.1" }],
+    ["path", { d: "M10.3 7.1v4.8h.7a1.6 2.4 0 0 0 0-4.8z", "stroke-width": "1.1" }]
+  ],
+  check: [["path", { d: "M3 8.5l3.2 3.2L13 4.8", "stroke-width": "1.8" }]],
+  warning: [
+    ["path", { d: "M8 2.2l6.2 11.1H1.8z" }],
+    ["path", { d: "M8 6.4v3.3" }],
+    ["path", { d: "M8 11.6v.1", "stroke-width": "1.8" }]
+  ]
+};
+
+function createIcon(doc, name) {
+  const svg = doc.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("class", "dcp-icon");
+  svg.setAttribute("viewBox", "0 0 16 16");
+  svg.setAttribute("width", "16");
+  svg.setAttribute("height", "16");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "1.3");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  svg.dataset.dcpIcon = name;
+  for (const [tag, attributes] of SHAPES[name] || []) {
+    const shape = doc.createElementNS(SVG_NS, tag);
+    for (const [key, value] of Object.entries(attributes)) shape.setAttribute(key, String(value));
+    svg.append(shape);
+  }
+  return svg;
+}
+
+return { createIcon };
+})();
+
 const { detectDotScreen, findSendButton, liveAdapter } = (() => {
 /**
  * Live ChatGPT Dot adapter.
@@ -900,13 +891,22 @@ const { detectDotScreen, findSendButton, liveAdapter } = (() => {
  * Message text and account details were not recorded.
  */
 
-function authorKind(message) {
-  const actions = [...message.querySelectorAll("[data-action]")].map((node) => node.getAttribute("data-action"));
-  if (actions.includes("open-image")) return "unknown";
+// The user's bubbles list "reply" before the reaction button; Dot's list them the other way round.
+function sideFromActions(actions) {
   const replyIndex = actions.indexOf("reply");
   const reactionIndex = actions.indexOf("toggle-reaction-picker");
   if (replyIndex === -1 || reactionIndex === -1) return "unknown";
   return replyIndex < reactionIndex ? "user" : "dot";
+}
+
+function messageActions(message) {
+  return [...message.querySelectorAll("[data-action]")].map((node) => node.getAttribute("data-action"));
+}
+
+function authorKind(message) {
+  const actions = messageActions(message);
+  if (actions.includes("open-image")) return "unknown";
+  return sideFromActions(actions);
 }
 
 function detectDotScreen(doc) {
@@ -972,6 +972,12 @@ const liveAdapter = {
     if (!message || typeof message.querySelector !== "function") return null;
     return message.querySelector("[data-markdown-text-style]");
   },
+  // Which side of the conversation a message is on, so the copy icons can line up with the bubble.
+  // Images do not change the side, so this does not use authorKind's image rule.
+  getAuthor(message) {
+    if (!message) return "unknown";
+    return sideFromActions(messageActions(message));
+  },
   getGenerationState(message) {
     if (!message) return "unknown";
     return authorKind(message) === "user" ? "complete" : "unknown";
@@ -985,11 +991,6 @@ const liveAdapter = {
     if (!element) return null;
     return { kind: "contenteditable", element };
   },
-  // The whole composer block; an open menu must not extend under it.
-  getComposerArea(doc) {
-    if (typeof doc?.querySelector !== "function") return null;
-    return doc.querySelector("[data-role='composer']");
-  },
   composerHasDraft(element) {
     const send = findSendButton(element?.closest?.("[data-role='composer']"));
     if (!send) return null;
@@ -1001,6 +1002,7 @@ return { detectDotScreen, findSendButton, liveAdapter };
 })();
 
 const { createController } = (() => {
+
 
 
 
@@ -1037,8 +1039,6 @@ function createController({
   window: view,
   clipboard,
   getLanguage,
-  getCopyFormat = () => "text",
-  setCopyFormat = () => {},
   schedule = (callback) => {
     const raf = view.requestAnimationFrame;
     if (typeof raf !== "function") {
@@ -1059,7 +1059,6 @@ function createController({
 }) {
   const copyUi = new Map();
   let pasteUi = null;
-  let openMenuUi = null;
   let savedCaret = null;
   let observer = null;
   let rootWatcher = null;
@@ -1186,28 +1185,17 @@ function createController({
     wrap.style.left = `${position.left}px`;
   }
 
+  // The icon row is always the last child of the message body, on its own line inside the bubble.
   function placeCopySlot(wrap, body) {
-    const place = findCopyAnchor(body);
-    if (!place?.anchor?.isConnected) return;
-    wrap.dataset.dcpPlacement = place.mode === "below" ? "below" : "inline";
-    if (place.mode === "below") {
-      if (place.anchor.nextElementSibling !== wrap) {
-        place.anchor.insertAdjacentElement("afterend", wrap);
-        uiWrites += 1;
-      }
-      return;
-    }
-    if (wrap.parentElement !== place.anchor || place.anchor.lastElementChild !== wrap) {
-      place.anchor.append(wrap);
-      uiWrites += 1;
-    }
+    if (wrap.parentElement === body && body.lastElementChild === wrap) return;
+    body.append(wrap);
+    uiWrites += 1;
   }
 
   function updatePositions() {
     for (const [message, ui] of copyUi) {
       guard("position", message, () => {
         if (!message.isConnected) {
-          if (openMenuUi === ui) closeMenu(ui, false);
           ui.wrap.remove();
           copyUi.delete(message);
           return;
@@ -1226,200 +1214,79 @@ function createController({
     });
   }
 
-  function currentFormat() {
-    return getCopyFormat() === "markdown" ? "markdown" : "text";
+  const COPY_FORMATS = [
+    { format: "text", icon: "copy", label: "copyAsText" },
+    { format: "markdown", icon: "copy-md", label: "copyAsMarkdown" }
+  ];
+  const RESULT_ICON_MS = 1500;
+
+  function showIcon(button, name) {
+    if (button.dataset.dcpIcon === name) return;
+    button.dataset.dcpIcon = name;
+    button.replaceChildren(createIcon(doc, name));
   }
 
   function applyCopyLabel(ui, state) {
-    const { button, toggle, items } = ui;
-    const markdown = currentFormat() === "markdown";
-    toggle.textContent = "▾";
-    toggle.setAttribute("aria-label", t("copyFormatMenu"));
-    toggle.title = t("copyFormatMenu");
-    for (const item of items) {
-      item.textContent = t(item.dataset.dcpFormat === "markdown" ? "copyAsMarkdown" : "copyAsText");
-      item.setAttribute("aria-checked", String(item.dataset.dcpFormat === currentFormat()));
+    const busy = state === "generating";
+    for (const { format, label } of COPY_FORMATS) {
+      const button = ui.buttons[format];
+      const text = busy ? t("copyBusy") : t(label);
+      button.disabled = busy;
+      button.setAttribute("aria-label", text);
+      button.title = text;
     }
-    // The visible label stays short for every message; the longer meaning lives in the tooltip and aria-label.
-    button.textContent = t(markdown ? "copyMarkdown" : "copy");
-    if (state === "generating") {
-      button.disabled = true;
-      toggle.disabled = true;
-      button.setAttribute("aria-label", t("copyBusy"));
-      button.title = t("copyBusy");
-      if (openMenuUi === ui) closeMenu(ui, false);
-      return;
-    }
-    button.disabled = false;
-    toggle.disabled = false;
-    const key = state === "unknown" ? (markdown ? "copyShownMarkdown" : "copyShown") : (markdown ? "copyMarkdown" : "copy");
-    button.setAttribute("aria-label", t(key));
-    button.title = t(key);
   }
 
-  function refreshCopyLabels() {
-    for (const [message, ui] of copyUi) applyCopyLabel(ui, adapter.getGenerationState(message));
+  // After a copy the pressed icon shows a check or a warning for a moment, then the copy icon again.
+  function flashResult(ui, format, ok) {
+    const button = ui.buttons[format];
+    const icon = COPY_FORMATS.find((entry) => entry.format === format).icon;
+    if (button._timer) view.clearTimeout(button._timer);
+    showIcon(button, ok ? "check" : "warning");
+    button.dataset.dcpResult = ok ? "success" : "error";
+    button._timer = view.setTimeout(() => {
+      button._timer = null;
+      showIcon(button, icon);
+      delete button.dataset.dcpResult;
+    }, ok ? RESULT_ICON_MS : RESULT_ICON_MS * 2);
   }
 
-  async function onCopy(message, status, format) {
+  async function onCopy(message, ui, format) {
     const state = adapter.getGenerationState(message);
     if (state === "generating") return;
     const body = adapter.getBodyElement(message);
     const text = body ? (format === "markdown" ? extractMarkdown(body) : extractPlainText(body)) : "";
-    if (!text) {
-      setStatus(status, t("copyFailed"), "error");
-      return;
-    }
-    const result = await writePlainText(text, clipboard, doc);
-    setStatus(status, result.ok ? t("copied") : t("copyFailed"), result.ok ? "success" : "error");
-  }
-
-  // The part of the message list that is on screen and not under the composer.
-  function visibleBounds() {
-    const bounds = { top: 0, bottom: view.innerHeight || 768 };
-    const root = adapter.getObserverRoot(doc)?.getBoundingClientRect?.();
-    if (root && root.height > 0) {
-      bounds.top = Math.max(bounds.top, root.top);
-      bounds.bottom = Math.min(bounds.bottom, root.bottom);
-    }
-    const composer = (adapter.getComposerArea?.(doc) || adapter.getComposer(doc)?.element)?.getBoundingClientRect?.();
-    if (composer && composer.height > 0 && composer.top > bounds.top && composer.top < bounds.bottom) bounds.bottom = composer.top;
-    return bounds;
-  }
-
-  function positionMenu(ui) {
-    if (!ui.toggle.isConnected) {
-      closeMenu(ui, false);
-      return;
-    }
-    const split = ui.toggle.parentElement.getBoundingClientRect();
-    // Without layout (no size), the menu keeps its default spot.
-    if (split.width === 0 && split.height === 0) return;
-    const position = computeMenuPosition({
-      trigger: split,
-      width: ui.menu.offsetWidth || 160,
-      height: ui.menu.offsetHeight || 72,
-      bounds: visibleBounds(),
-      viewportWidth: view.innerWidth || 1024,
-      viewportHeight: view.innerHeight || 768
-    });
-    if (position.hidden) {
-      closeMenu(ui, false);
-      return;
-    }
-    ui.menu.dataset.dcpPlacement = position.placement;
-    ui.menu.style.top = `${position.top}px`;
-    ui.menu.style.left = `${position.left}px`;
-  }
-
-  function openMenu(ui) {
-    if (openMenuUi && openMenuUi !== ui) closeMenu(openMenuUi, false);
-    openMenuUi = ui;
-    // While open, the menu sits on <body> so the bubble's stacking and clipping cannot cover it.
-    (doc.body || doc.documentElement).append(ui.menu);
-    ui.menu.hidden = false;
-    ui.toggle.setAttribute("aria-expanded", "true");
-    positionMenu(ui);
-    if (openMenuUi !== ui) return;
-    const checked = ui.items.find((item) => item.dataset.dcpFormat === currentFormat()) || ui.items[0];
-    checked.focus({ preventScroll: true });
-  }
-
-  function closeMenu(ui, returnFocus) {
-    ui.menu.hidden = true;
-    ui.toggle.setAttribute("aria-expanded", "false");
-    if (ui.menu.parentElement !== ui.wrap) ui.wrap.insertBefore(ui.menu, ui.status);
-    if (openMenuUi === ui) openMenuUi = null;
-    if (returnFocus) ui.toggle.focus();
-  }
-
-  function onMenuKey(ui, event) {
-    const index = ui.items.indexOf(doc.activeElement);
-    const move = { ArrowDown: 1, ArrowUp: -1 }[event.key];
-    if (move) {
-      event.preventDefault();
-      ui.items[(index + move + ui.items.length) % ui.items.length].focus();
-      return;
-    }
-    if (event.key === "Home" || event.key === "End") {
-      event.preventDefault();
-      ui.items[event.key === "Home" ? 0 : ui.items.length - 1].focus();
-      return;
-    }
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      closeMenu(ui, true);
-      return;
-    }
-    if (event.key === "Tab") closeMenu(ui, false);
+    const result = text ? await writePlainText(text, clipboard, doc) : { ok: false };
+    flashResult(ui, format, result.ok);
+    setStatus(ui.status, result.ok ? t("copied") : t("copyFailed"), result.ok ? "success" : "error");
   }
 
   function createCopyUi(message) {
-    const wrap = doc.createElement("span");
+    const wrap = doc.createElement("div");
     wrap.setAttribute("data-dcp-ui", "");
     wrap.className = "dcp-copy-slot";
-    const split = doc.createElement("span");
-    split.className = "dcp-split";
-    const button = doc.createElement("button");
-    button.type = "button";
-    button.className = "dcp-btn dcp-btn-main";
-    button.setAttribute("data-dcp-copy", "");
-    const toggle = doc.createElement("button");
-    toggle.type = "button";
-    toggle.className = "dcp-btn dcp-btn-toggle";
-    toggle.setAttribute("data-dcp-copy-menu", "");
-    toggle.setAttribute("aria-haspopup", "menu");
-    toggle.setAttribute("aria-expanded", "false");
-    const menu = doc.createElement("span");
-    menu.setAttribute("data-dcp-ui", "");
-    menu.className = "dcp-menu";
-    menu.setAttribute("role", "menu");
-    menu.hidden = true;
-    const items = ["text", "markdown"].map((format) => {
-      const item = doc.createElement("button");
-      item.type = "button";
-      item.className = "dcp-menu-item";
-      item.setAttribute("role", "menuitemradio");
-      item.dataset.dcpFormat = format;
-      menu.append(item);
-      return item;
-    });
+    const buttons = {};
+    for (const { format, icon } of COPY_FORMATS) {
+      const button = doc.createElement("button");
+      button.type = "button";
+      button.className = "dcp-icon-btn";
+      button.setAttribute("data-dcp-copy", format);
+      showIcon(button, icon);
+      buttons[format] = button;
+      wrap.append(button);
+    }
     const status = doc.createElement("span");
     status.setAttribute("data-dcp-ui", "");
     status.className = "dcp-status";
     status.setAttribute("role", "status");
     status.setAttribute("aria-live", "polite");
-    split.append(button, toggle);
-    wrap.append(split, menu, status);
-    const ui = { wrap, button, toggle, menu, items, status };
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      onCopy(message, status, currentFormat());
-    });
-    toggle.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (openMenuUi === ui) closeMenu(ui, true);
-      else openMenu(ui);
-    });
-    toggle.addEventListener("keydown", (event) => {
-      if (event.key !== "ArrowDown" || openMenuUi === ui) return;
-      event.preventDefault();
-      openMenu(ui);
-    });
-    menu.addEventListener("keydown", (event) => onMenuKey(ui, event));
-    for (const item of items) {
-      item.addEventListener("click", (event) => {
+    wrap.append(status);
+    const ui = { wrap, buttons, status };
+    for (const { format } of COPY_FORMATS) {
+      buttons[format].addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
-        const format = item.dataset.dcpFormat;
-        closeMenu(ui, true);
-        // Copy first so the clipboard write stays inside this click.
-        onCopy(message, status, format);
-        setCopyFormat(format);
-        refreshCopyLabels();
+        onCopy(message, ui, format);
       });
     }
     return ui;
@@ -1443,6 +1310,8 @@ function createController({
     }
     const body = adapter.getBodyElement(message);
     if (body) placeCopySlot(ui.wrap, body);
+    const author = typeof adapter.getAuthor === "function" ? adapter.getAuthor(message) : "unknown";
+    if (ui.wrap.dataset.dcpAuthor !== author) ui.wrap.dataset.dcpAuthor = author;
     applyCopyLabel(ui, adapter.getGenerationState(message));
   }
 
@@ -1648,15 +1517,8 @@ function createController({
     on(doc, "selectionchange", rememberCaret, true);
     on(doc, "keyup", rememberCaret, true);
     on(doc, "mouseup", rememberCaret, true);
-    on(doc, "pointerdown", (event) => {
-      if (openMenuUi && !openMenuUi.wrap.contains(event.target) && !openMenuUi.menu.contains(event.target)) closeMenu(openMenuUi, false);
-    }, true);
-    const reflow = () => {
-      updatePositions();
-      if (openMenuUi) positionMenu(openMenuUi);
-    };
-    on(doc, "scroll", reflow, { capture: true, passive: true });
-    on(view, "resize", reflow);
+    on(doc, "scroll", () => updatePositions(), { capture: true, passive: true });
+    on(view, "resize", () => updatePositions());
     return { active: true, reason: detection.reason };
   }
 
@@ -1671,7 +1533,6 @@ function createController({
     copyUi.clear();
     pasteUi?.wrap.remove();
     pasteUi = null;
-    openMenuUi = null;
     savedCaret = null;
     queue = [];
     queued = false;
@@ -1687,7 +1548,6 @@ function createController({
   return {
     start,
     stop,
-    refreshCopyLabels,
     get scanCount() {
       return scanCount;
     },
@@ -1724,15 +1584,6 @@ function startApp({
 
   function log(event, detail) {
     console.warn("[Dot Copy Paste]", event, { version, build, ...detail });
-  }
-
-  function setCopyFormat(copyFormat) {
-    settings = { ...settings, copyFormat };
-    const storage = chrome.storage?.local;
-    if (!storage || typeof storage.set !== "function") return;
-    saveSettings(storage, settings).catch((error) => {
-      console.error("[Dot Copy Paste]", error?.name || "Error");
-    });
   }
 
   function startController() {
@@ -1794,9 +1645,7 @@ function startApp({
       document: doc,
       window: view,
       clipboard,
-      getLanguage: () => resolveLanguage(settings.language),
-      getCopyFormat: () => settings.copyFormat,
-      setCopyFormat
+      getLanguage: () => resolveLanguage(settings.language)
     });
     return startController();
   }
@@ -1855,13 +1704,6 @@ function startApp({
 
   chrome.storage?.onChanged.addListener((changes, area) => {
     if (area !== "local" || !changes.settings) return;
-    const next = normalizeSettings(changes.settings.newValue);
-    // A format change alone only relabels the buttons, so a "Copied" status is not wiped by a restart.
-    if (controller && next.enabled === settings.enabled && next.language === settings.language) {
-      settings = next;
-      controller.refreshCopyLabels();
-      return;
-    }
     restart("settings");
   });
 
@@ -1884,7 +1726,7 @@ startApp({
   chrome,
   window,
   document,
-  build: "5aac1652e615"
+  build: "f106fc3d9e66"
 }).catch((error) => {
   const name = error && typeof error.name === "string" ? error.name : "Error";
   console.error("[Dot Copy Paste]", name);

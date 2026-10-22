@@ -44,14 +44,15 @@ test("confirmed Dot landmarks activate copy buttons and leave image-only message
     getLanguage: () => "ko"
   });
   controller.start();
-  assert.equal(doc.querySelectorAll("[data-dcp-copy]").length, 2);
-  assert.equal(doc.querySelector("[data-message-id='img1'] [data-dcp-copy]"), null);
-  assert.equal(doc.querySelector("[data-message-id='u1'] [data-dcp-copy]").textContent, "복사");
+  assert.equal(doc.querySelectorAll("[data-dcp-copy='text']").length, 2);
+  assert.equal(doc.querySelector("[data-message-id='img1'] [data-dcp-copy='text']"), null);
+  assert.equal(doc.querySelector("[data-message-id='u1'] [data-dcp-copy='text']").getAttribute("aria-label"), "텍스트로 복사");
+  // The icon row is the last child of the body whether the text ends in a paragraph or a code block.
   const userSlot = doc.querySelector("[data-message-id='u1'] .dcp-copy-slot");
-  assert.equal(userSlot.dataset.dcpPlacement, "inline");
-  assert.equal(userSlot.parentElement.tagName, "P");
+  assert.equal(userSlot.parentElement.getAttribute("data-markdown-text-style"), "assistant-message");
+  assert.equal(userSlot.parentElement.lastElementChild, userSlot);
   const dotSlot = doc.querySelector("[data-message-id='d1'] .dcp-copy-slot");
-  assert.equal(dotSlot.dataset.dcpPlacement, "below");
+  assert.equal(dotSlot.parentElement.lastElementChild, dotSlot);
   assert.equal(dotSlot.previousElementSibling.tagName, "PRE");
   assert.equal(doc.querySelector("[data-dcp-paste]").textContent, "붙여넣기");
   assert.equal(doc.querySelector("[data-dcp-paste]").parentElement.className, "dcp-anchor");
@@ -59,8 +60,8 @@ test("confirmed Dot landmarks activate copy buttons and leave image-only message
   added.textContent = "이어진 문장";
   doc.querySelector("[data-message-id='u1'] [data-markdown-text-style]").append(added);
   await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.equal(doc.querySelectorAll("[data-message-id='u1'] [data-dcp-copy]").length, 1);
-  assert.equal(doc.querySelector("[data-message-id='u1'] .dcp-copy-slot").parentElement, added);
+  assert.equal(doc.querySelectorAll("[data-message-id='u1'] [data-dcp-copy='text']").length, 1);
+  assert.equal(added.nextElementSibling, doc.querySelector("[data-message-id='u1'] .dcp-copy-slot"));
 });
 
 test("an empty Dot composer that stays unaccepted is restored", async () => {

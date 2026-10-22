@@ -79,33 +79,25 @@ async function pageWith(stored) {
   return doc;
 }
 
-test("page buttons, the format menu, and status text follow the same rule on a Korean browser", async () => {
+const labels = (slot) => [...slot.querySelectorAll("[data-dcp-copy]")].map((button) => [button.getAttribute("aria-label"), button.title]);
+
+test("copy icon tooltips and status text follow the same rule on a Korean browser", async () => {
   const doc = await pageWith(undefined);
   const known = doc.querySelector("[data-fixture-id='m1'] .dcp-copy-slot");
-  const unknown = doc.querySelector("[data-fixture-id='m5'] [data-dcp-copy]");
-  assert.equal(known.querySelector("[data-dcp-copy]").textContent, MESSAGES.en.copy);
-  assert.equal(unknown.textContent, MESSAGES.en.copy);
-  assert.equal(unknown.getAttribute("aria-label"), MESSAGES.en.copyShown);
-  assert.equal(unknown.title, MESSAGES.en.copyShown);
-  assert.equal(known.querySelector("[data-dcp-copy-menu]").getAttribute("aria-label"), MESSAGES.en.copyFormatMenu);
-  assert.deepEqual([...known.querySelectorAll("[role='menuitemradio']")].map((item) => item.textContent), [MESSAGES.en.copyAsText, MESSAGES.en.copyAsMarkdown]);
+  assert.deepEqual(labels(known), [[MESSAGES.en.copyAsText, MESSAGES.en.copyAsText], [MESSAGES.en.copyAsMarkdown, MESSAGES.en.copyAsMarkdown]]);
+  assert.deepEqual(labels(doc.querySelector("[data-fixture-id='m5'] .dcp-copy-slot")), labels(known));
   assert.equal(doc.querySelector("[data-dcp-paste]").textContent, MESSAGES.en.paste);
   doc.querySelector("[data-dcp-paste]").click();
   await flush();
   assert.equal(doc.querySelector("[data-dcp-paste]").parentElement.querySelector(".dcp-status").textContent, MESSAGES.en.clipboardEmpty);
 
   const legacy = await pageWith({ language: "ko" });
-  assert.equal(legacy.querySelector("[data-fixture-id='m1'] [data-dcp-copy]").textContent, MESSAGES.en.copy);
-  assert.equal(legacy.querySelector("[data-fixture-id='m5'] [data-dcp-copy]").getAttribute("aria-label"), MESSAGES.en.copyShown);
+  assert.equal(legacy.querySelector("[data-fixture-id='m1'] [data-dcp-copy='text']").getAttribute("aria-label"), MESSAGES.en.copyAsText);
 
-  const korean = await pageWith({ language: "ko", languageChosen: true });
-  const slot = korean.querySelector("[data-fixture-id='m1'] .dcp-copy-slot");
-  assert.equal(slot.querySelector("[data-dcp-copy]").textContent, MESSAGES.ko.copy);
-  assert.equal(korean.querySelector("[data-fixture-id='m5'] [data-dcp-copy]").textContent, MESSAGES.ko.copy);
-  assert.equal(korean.querySelector("[data-fixture-id='m5'] [data-dcp-copy]").getAttribute("aria-label"), MESSAGES.ko.copyShown);
-  assert.equal(korean.querySelector("[data-fixture-id='m5'] [data-dcp-copy]").title, MESSAGES.ko.copyShown);
-  assert.equal(slot.querySelector("[data-dcp-copy-menu]").getAttribute("aria-label"), MESSAGES.ko.copyFormatMenu);
-  assert.deepEqual([...slot.querySelectorAll("[role='menuitemradio']")].map((item) => item.textContent), [MESSAGES.ko.copyAsText, MESSAGES.ko.copyAsMarkdown]);
+  const koreanPage = await pageWith({ language: "ko", languageChosen: true });
+  const korean = [[MESSAGES.ko.copyAsText, MESSAGES.ko.copyAsText], [MESSAGES.ko.copyAsMarkdown, MESSAGES.ko.copyAsMarkdown]];
+  assert.deepEqual(labels(koreanPage.querySelector("[data-fixture-id='m1'] .dcp-copy-slot")), korean);
+  assert.deepEqual(labels(koreanPage.querySelector("[data-fixture-id='m5'] .dcp-copy-slot")), korean);
 });
 
 test("picking a language in the popup saves it as a deliberate choice", async () => {
@@ -133,12 +125,12 @@ test("the started line shows the language in use and the stored settings", async
   console.warn = () => {};
   console.info = (...args) => lines.push(args);
   try {
-    await startApp({ chrome: fakeChrome({ language: "ko", copyFormat: "markdown" }, "ko-KR"), window: dom.window, document: doc, adapter: createFixtureAdapter(doc), clipboard: createClipboard() });
+    await startApp({ chrome: fakeChrome({ language: "ko", enabled: true }, "ko-KR"), window: dom.window, document: doc, adapter: createFixtureAdapter(doc), clipboard: createClipboard() });
   } finally {
     Object.assign(console, originals);
   }
   const started = lines.find((args) => args[1] === "started");
   assert.ok(started);
   assert.equal(started[2].language, "en");
-  assert.deepEqual(started[2].storedSettings, { language: "ko", copyFormat: "markdown" });
+  assert.deepEqual(started[2].storedSettings, { language: "ko", enabled: true });
 });

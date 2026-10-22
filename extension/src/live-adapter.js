@@ -5,13 +5,22 @@
  * Message text and account details were not recorded.
  */
 
-function authorKind(message) {
-  const actions = [...message.querySelectorAll("[data-action]")].map((node) => node.getAttribute("data-action"));
-  if (actions.includes("open-image")) return "unknown";
+// The user's bubbles list "reply" before the reaction button; Dot's list them the other way round.
+function sideFromActions(actions) {
   const replyIndex = actions.indexOf("reply");
   const reactionIndex = actions.indexOf("toggle-reaction-picker");
   if (replyIndex === -1 || reactionIndex === -1) return "unknown";
   return replyIndex < reactionIndex ? "user" : "dot";
+}
+
+function messageActions(message) {
+  return [...message.querySelectorAll("[data-action]")].map((node) => node.getAttribute("data-action"));
+}
+
+function authorKind(message) {
+  const actions = messageActions(message);
+  if (actions.includes("open-image")) return "unknown";
+  return sideFromActions(actions);
 }
 
 export function detectDotScreen(doc) {
@@ -77,6 +86,12 @@ export const liveAdapter = {
     if (!message || typeof message.querySelector !== "function") return null;
     return message.querySelector("[data-markdown-text-style]");
   },
+  // Which side of the conversation a message is on, so the copy icons can line up with the bubble.
+  // Images do not change the side, so this does not use authorKind's image rule.
+  getAuthor(message) {
+    if (!message) return "unknown";
+    return sideFromActions(messageActions(message));
+  },
   getGenerationState(message) {
     if (!message) return "unknown";
     return authorKind(message) === "user" ? "complete" : "unknown";
@@ -89,11 +104,6 @@ export const liveAdapter = {
     const element = doc.querySelector("[data-role='composer'] [contenteditable='true'][role='textbox']");
     if (!element) return null;
     return { kind: "contenteditable", element };
-  },
-  // The whole composer block; an open menu must not extend under it.
-  getComposerArea(doc) {
-    if (typeof doc?.querySelector !== "function") return null;
-    return doc.querySelector("[data-role='composer']");
   },
   composerHasDraft(element) {
     const send = findSendButton(element?.closest?.("[data-role='composer']"));

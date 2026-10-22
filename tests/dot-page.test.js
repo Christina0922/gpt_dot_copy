@@ -43,8 +43,8 @@ function startController(dom) {
 }
 
 const rows = (doc) => [...doc.querySelectorAll("article.message-row")];
-const rowsWithoutButton = (doc) => rows(doc).filter((row) => !row.querySelector("[data-dcp-copy]")).map((row) => row.dataset.messageId);
-const buttonCounts = (doc) => rows(doc).map((row) => row.querySelectorAll("[data-dcp-copy]").length);
+const rowsWithoutButton = (doc) => rows(doc).filter((row) => !row.querySelector("[data-dcp-copy='text']")).map((row) => row.dataset.messageId);
+const buttonCounts = (doc) => rows(doc).map((row) => row.querySelectorAll("[data-dcp-copy='text']").length);
 
 // Adds a row the way the page does: an empty row first, then the reply streamed in pieces.
 async function streamRow(doc, tick, index, { author = index % 2 ? "dot" : "user", chunks = 8 } = {}) {
@@ -236,7 +236,7 @@ test("a page that renders the Dot landmarks late still reaches started", async (
   await flush();
   assert.ok(events(logged).includes("started"), JSON.stringify(events(logged)));
   assert.equal(typeof entry(logged, "started").waitedMs, "number");
-  assert.ok(doc.querySelector("[data-dcp-copy]"));
+  assert.ok(doc.querySelector("[data-dcp-copy='text']"));
 });
 
 test("a composer that becomes editable after it is inserted still reaches started", async (t) => {

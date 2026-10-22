@@ -1,6 +1,6 @@
 import { createController } from "./controller.js";
 import { liveAdapter } from "./live-adapter.js";
-import { normalizeSettings, readStoredSettings, saveSettings } from "./settings.js";
+import { normalizeSettings, readStoredSettings } from "./settings.js";
 import { resolveLanguage } from "./i18n.js";
 
 // When a page is still waiting for the Dot landmarks, a line is logged at each of these times.
@@ -22,15 +22,6 @@ export function startApp({
 
   function log(event, detail) {
     console.warn("[Dot Copy Paste]", event, { version, build, ...detail });
-  }
-
-  function setCopyFormat(copyFormat) {
-    settings = { ...settings, copyFormat };
-    const storage = chrome.storage?.local;
-    if (!storage || typeof storage.set !== "function") return;
-    saveSettings(storage, settings).catch((error) => {
-      console.error("[Dot Copy Paste]", error?.name || "Error");
-    });
   }
 
   function startController() {
@@ -92,9 +83,7 @@ export function startApp({
       document: doc,
       window: view,
       clipboard,
-      getLanguage: () => resolveLanguage(settings.language),
-      getCopyFormat: () => settings.copyFormat,
-      setCopyFormat
+      getLanguage: () => resolveLanguage(settings.language)
     });
     return startController();
   }
@@ -153,13 +142,6 @@ export function startApp({
 
   chrome.storage?.onChanged.addListener((changes, area) => {
     if (area !== "local" || !changes.settings) return;
-    const next = normalizeSettings(changes.settings.newValue);
-    // A format change alone only relabels the buttons, so a "Copied" status is not wiped by a restart.
-    if (controller && next.enabled === settings.enabled && next.language === settings.language) {
-      settings = next;
-      controller.refreshCopyLabels();
-      return;
-    }
     restart("settings");
   });
 

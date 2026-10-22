@@ -29,13 +29,13 @@ function setup(dom, language = "ko") {
 test("copy buttons exclude controls and copy the current body after reuse", async () => {
   const { clipboard, controller, doc } = setup(mount());
   assert.equal(controller.start().active, true);
-  const copies = [...doc.querySelectorAll("[data-dcp-copy]")];
+  const copies = [...doc.querySelectorAll("[data-dcp-copy='text']")];
   assert.equal(copies.length, 4);
-  assert.equal(doc.querySelector("[data-fixture-id='m3'] [data-dcp-copy]"), null);
-  assert.equal(doc.querySelector("[data-fixture-id='m4'] [data-dcp-copy]"), null);
-  assert.equal(doc.querySelector("[data-fixture-id='m6'] [data-dcp-copy]").disabled, true);
+  assert.equal(doc.querySelector("[data-fixture-id='m3'] [data-dcp-copy='text']"), null);
+  assert.equal(doc.querySelector("[data-fixture-id='m4'] [data-dcp-copy='text']"), null);
+  assert.equal(doc.querySelector("[data-fixture-id='m6'] [data-dcp-copy='text']").disabled, true);
 
-  const userButton = doc.querySelector("[data-fixture-id='m1'] [data-dcp-copy]");
+  const userButton = doc.querySelector("[data-fixture-id='m1'] [data-dcp-copy='text']");
   userButton.click();
   await flush();
   const userText = clipboard.calls.at(-1)[1];
@@ -45,7 +45,7 @@ test("copy buttons exclude controls and copy the current body after reuse", asyn
     assert.equal(userText.includes(blocked), false, blocked);
   }
 
-  const assistantButton = doc.querySelector("[data-fixture-id='m2'] [data-dcp-copy]");
+  const assistantButton = doc.querySelector("[data-fixture-id='m2'] [data-dcp-copy='text']");
   assistantButton.click();
   await flush();
   const assistantText = clipboard.calls.at(-1)[1];
@@ -59,7 +59,7 @@ test("copy buttons exclude controls and copy the current body after reuse", asyn
   const body = doc.querySelector("[data-fixture-id='m1'] [data-fixture='body']");
   body.textContent = "바뀐 본문";
   await flush();
-  doc.querySelector("[data-fixture-id='m1'] [data-dcp-copy]").click();
+  doc.querySelector("[data-fixture-id='m1'] [data-dcp-copy='text']").click();
   await flush();
   assert.equal(clipboard.calls.at(-1)[1], "바뀐 본문");
   assert.equal(doc.querySelector("[data-fixture-id='m1'] .dcp-status").textContent, MESSAGES.ko.copied);
@@ -69,10 +69,10 @@ test("unknown generation is labeled and a failed copy is not marked successful",
   const dom = mount();
   const { controller, doc } = setup(dom);
   controller.start();
-  const unknown = doc.querySelector("[data-fixture-id='m5'] [data-dcp-copy]");
-  assert.equal(unknown.textContent, MESSAGES.ko.copy);
-  assert.equal(unknown.getAttribute("aria-label"), MESSAGES.ko.copyShown);
-  assert.equal(unknown.title, MESSAGES.ko.copyShown);
+  const unknown = doc.querySelector("[data-fixture-id='m5'] [data-dcp-copy='text']");
+  assert.equal(unknown.disabled, false);
+  assert.equal(unknown.getAttribute("aria-label"), MESSAGES.ko.copyAsText);
+  assert.equal(unknown.title, MESSAGES.ko.copyAsText);
 
   dom.window.document.execCommand = () => false;
   const clipboard = {
@@ -91,7 +91,7 @@ test("unknown generation is labeled and a failed copy is not marked successful",
   });
   controller.stop();
   retry.start();
-  doc.querySelector("[data-fixture-id='m1'] [data-dcp-copy]").click();
+  doc.querySelector("[data-fixture-id='m1'] [data-dcp-copy='text']").click();
   await flush();
   const status = doc.querySelector("[data-fixture-id='m1'] .dcp-status");
   assert.equal(status.textContent, MESSAGES.ko.copyFailed);
@@ -186,14 +186,14 @@ test("a missing or unknown composer is not modified", async () => {
 test("duplicate buttons are not created and our DOM updates do not keep scanning", async () => {
   const { adapter, controller, doc } = setup(mount());
   controller.start();
-  const first = doc.querySelectorAll("[data-dcp-copy]").length;
+  const first = doc.querySelectorAll("[data-dcp-copy='text']").length;
   doc.querySelector("[data-fixture='thread']").append(doc.createElement("span"));
   await flush();
-  assert.equal(doc.querySelectorAll("[data-dcp-copy]").length, first);
+  assert.equal(doc.querySelectorAll("[data-dcp-copy='text']").length, first);
   assert.ok(controller.scanCount < 10);
   assert.ok(adapter.messagesInCalls.length < 15);
   controller.start();
-  assert.equal(doc.querySelectorAll("[data-dcp-copy]").length, first);
+  assert.equal(doc.querySelectorAll("[data-dcp-copy='text']").length, first);
 });
 
 test("a replaced message gets its own body and a removed thread is observed again", async () => {
@@ -206,7 +206,7 @@ test("a replaced message gets its own body and a removed thread is observed agai
   article.innerHTML = `<div data-fixture="body"><p>새 메시지</p></div>`;
   thread.append(article);
   await flush();
-  article.querySelector("[data-dcp-copy]").click();
+  article.querySelector("[data-dcp-copy='text']").click();
   await flush();
   assert.equal(clipboard.calls.at(-1)[1], "새 메시지");
 
@@ -220,7 +220,7 @@ test("a replaced message gets its own body and a removed thread is observed agai
   replacement.append(next);
   parent.replaceChild(replacement, thread);
   await flush();
-  replacement.querySelector("[data-dcp-copy]").click();
+  replacement.querySelector("[data-dcp-copy='text']").click();
   await flush();
   assert.equal(clipboard.calls.at(-1)[1], "전환된 대화");
 });
@@ -289,7 +289,7 @@ test("disabling the extension removes buttons and does not read the clipboard", 
     adapter: createFixtureAdapter(dom.window.document),
     clipboard
   });
-  assert.ok(dom.window.document.querySelector("[data-dcp-copy]"));
+  assert.ok(dom.window.document.querySelector("[data-dcp-copy='text']"));
   enabled = false;
   listener({ settings: { newValue: { enabled: false } } }, "local");
   await flush();

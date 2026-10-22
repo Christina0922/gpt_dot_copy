@@ -48,7 +48,7 @@ test("buttons appear after Dot landmarks are added", async () => {
   article.append(body, reply, reaction);
   doc.querySelector("[data-role='messages-scroll']").append(article);
   await flush();
-  assert.equal(doc.querySelectorAll("[data-dcp-copy]").length, 1);
+  assert.equal(doc.querySelectorAll("[data-dcp-copy='text']").length, 1);
   assert.equal(doc.querySelectorAll("[data-dcp-paste]").length, 1);
 });
 

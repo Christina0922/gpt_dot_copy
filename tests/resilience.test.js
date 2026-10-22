@@ -49,7 +49,7 @@ function addMessage(doc, id) {
   doc.querySelector("[data-role='messages-scroll']").append(article);
 }
 
-const withoutButton = (doc) => [...doc.querySelectorAll("article")].filter((a) => !a.querySelector("[data-dcp-copy]")).map((a) => a.dataset.messageId);
+const withoutButton = (doc) => [...doc.querySelectorAll("article")].filter((a) => !a.querySelector("[data-dcp-copy='text']")).map((a) => a.dataset.messageId);
 
 test("a long session keeps adding copy buttons past the old 40-refresh cap", async (t) => {
   const logged = captureErrors(t);
@@ -144,16 +144,16 @@ test("different errors spread out in time do not stop observing", async (t) => {
 test("a page that keeps removing the button pauses observing instead of looping", async (t) => {
   const logged = captureErrors(t);
   const { dom, doc } = dotPage(1);
-  const p = doc.querySelector("article p");
+  const body = doc.querySelector("article [data-markdown-text-style]");
   let removals = 0;
   const fighter = new dom.window.MutationObserver(() => {
-    const slot = p.querySelector(".dcp-copy-slot");
+    const slot = body.querySelector(".dcp-copy-slot");
     if (slot && removals < 1000) {
       removals += 1;
       slot.remove();
     }
   });
-  fighter.observe(p, { childList: true });
+  fighter.observe(body, { childList: true });
   start(dom);
   for (let index = 0; index < 50 && !logged.some((args) => args[1] === "paused"); index += 1) await flush();
   fighter.disconnect();
