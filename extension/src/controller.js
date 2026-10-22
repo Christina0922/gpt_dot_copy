@@ -22,6 +22,7 @@ const ERROR_REPEAT_WINDOW_MS = 2000;
 const LOOP_LIMIT = 120;
 const LOOP_WINDOW_MS = 2000;
 const LOOP_PAUSE_MS = 2000;
+const FRAME_FALLBACK_MS = 500;
 
 function clip(value, max) {
   const text = String(value ?? "");
@@ -38,8 +39,20 @@ export function createController({
   setCopyFormat = () => {},
   schedule = (callback) => {
     const raf = view.requestAnimationFrame;
-    if (typeof raf === "function") raf.call(view, () => callback());
-    else callback();
+    if (typeof raf !== "function") {
+      callback();
+      return;
+    }
+    // Animation frames do not run in a background tab, so a timer runs the refresh if no frame comes.
+    let done = false;
+    const run = () => {
+      if (done) return;
+      done = true;
+      view.clearTimeout(timer);
+      callback();
+    };
+    const timer = view.setTimeout(run, FRAME_FALLBACK_MS);
+    raf.call(view, run);
   }
 }) {
   const copyUi = new Map();
@@ -47,7 +60,9 @@ export function createController({
   let openMenuUi = null;
   let savedCaret = null;
   let observer = null;
-  let parentObserver = null;
+  let rootWatcher = null;
+  let observedRoot = null;
+  let waitingForRoot = false;
   let stopped = true;
   let scanCount = 0;
   let queued = false;
@@ -80,6 +95,11 @@ export function createController({
       messageId: message ? clip(message.getAttribute?.("data-message-id") || "", 64) || null : null,
       isMessage: Boolean(message && message === element)
     };
+  }
+
+  // Every stop, pause, and resume of observing prints exactly one line.
+  function logLifecycle(event, detail) {
+    console.warn("[Dot Copy Paste]", event, detail);
   }
 
   function reportFailure(stage, error, node) {
@@ -476,12 +496,13 @@ export function createController({
 
   function pauseForLoop() {
     disconnectObservers();
-    console.error("[Dot Copy Paste]", "paused", { reason: "observer-loop", refreshes: loopTimes.length, windowMs: LOOP_WINDOW_MS, pauseMs: LOOP_PAUSE_MS });
+    logLifecycle("paused", { reason: "observer-loop", refreshes: loopTimes.length, windowMs: LOOP_WINDOW_MS, pauseMs: LOOP_PAUSE_MS });
     loopTimes = [];
     pauseTimer = view.setTimeout(() => {
       pauseTimer = null;
       if (stopped || halted) return;
-      connectObserver();
+      connectObservers();
+      logLifecycle("resumed", { reason: "observer-loop-pause-ended" });
       const root = adapter.getObserverRoot(doc);
       if (root) queueRefresh([root]);
     }, LOOP_PAUSE_MS);
@@ -521,43 +542,60 @@ export function createController({
     return nodes;
   }
 
-  function connectObserver() {
-    const root = adapter.getObserverRoot(doc);
-    if (!root || typeof view.MutationObserver !== "function") return;
+  function connectRootObserver() {
+    observer?.disconnect();
+    observer = null;
+    observedRoot = adapter.getObserverRoot(doc);
+    if (!observedRoot) return false;
     observer = new view.MutationObserver((mutations) => {
       queueRefresh(mutationNodes(mutations));
     });
-    observer.observe(root, { childList: true, subtree: true, characterData: true });
-    const parent = root.parentElement;
-    if (parent) {
-      parentObserver = new view.MutationObserver(() => {
-        if (root.isConnected) return;
-        disconnectObservers();
-        const nextRoot = adapter.getObserverRoot(doc);
-        if (!nextRoot) return;
-        connectObserver();
-        queueRefresh([nextRoot]);
-      });
-      parentObserver.observe(parent, { childList: true });
+    observer.observe(observedRoot, { childList: true, subtree: true, characterData: true });
+    return true;
+  }
+
+  // The page can replace the message list or any ancestor of it; the old root then goes quiet.
+  // This document-wide watcher only checks whether the observed root is still attached.
+  function checkObservedRoot() {
+    if (stopped || halted || pauseTimer) return;
+    if (observedRoot?.isConnected && !waitingForRoot) return;
+    if (!waitingForRoot) {
+      waitingForRoot = true;
+      observer?.disconnect();
+      observer = null;
+      logLifecycle("paused", { reason: "message-list-removed" });
     }
+    if (!connectRootObserver()) return;
+    waitingForRoot = false;
+    logLifecycle("resumed", { reason: "message-list-found" });
+    queueRefresh([observedRoot]);
+  }
+
+  function connectObservers() {
+    if (typeof view.MutationObserver !== "function") return;
+    connectRootObserver();
+    const documentRoot = doc.documentElement;
+    if (!documentRoot) return;
+    rootWatcher = new view.MutationObserver(() => checkObservedRoot());
+    rootWatcher.observe(documentRoot, { childList: true, subtree: true });
   }
 
   function disconnectObservers() {
     observer?.disconnect();
-    parentObserver?.disconnect();
+    rootWatcher?.disconnect();
     observer = null;
-    parentObserver = null;
+    rootWatcher = null;
   }
 
   function start() {
-    stop();
+    stop("restart");
     const detection = adapter.detect(doc);
     if (!detection?.active) return { active: false, reason: detection?.reason || "inactive" };
     stopped = false;
     const root = adapter.getObserverRoot(doc);
     if (root) queueRefresh([root]);
-    syncPasteButton();
-    connectObserver();
+    guard("paste-button", null, () => syncPasteButton());
+    connectObservers();
     on(doc, "selectionchange", rememberCaret, true);
     on(doc, "keyup", rememberCaret, true);
     on(doc, "mouseup", rememberCaret, true);
@@ -569,9 +607,12 @@ export function createController({
     return { active: true, reason: detection.reason };
   }
 
-  function stop() {
+  function stop(reason = "stop") {
+    if (!stopped) logLifecycle("stopped", { reason });
     stopped = true;
     disconnectObservers();
+    observedRoot = null;
+    waitingForRoot = false;
     while (cleanups.length) cleanups.pop()();
     for (const ui of copyUi.values()) ui.wrap.remove();
     copyUi.clear();

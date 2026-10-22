@@ -23,7 +23,6 @@ export const MESSAGES = {
     popupIntro: "Turns copy and paste buttons on or off, sets the copy format, and shows the version.",
     enabledLabel: "Use copy and paste buttons",
     languageLabel: "Language",
-    languageAuto: "Browser language",
     languageKo: "Korean",
     languageEn: "English",
     clipboardHeading: "Clipboard reading",
@@ -62,7 +61,6 @@ export const MESSAGES = {
     popupIntro: "복사·붙여넣기 버튼을 켜거나 끄고, 복사 형식을 정하고, 버전을 확인합니다.",
     enabledLabel: "복사·붙여넣기 버튼 사용",
     languageLabel: "언어",
-    languageAuto: "브라우저 언어",
     languageKo: "한국어",
     languageEn: "영어",
     clipboardHeading: "클립보드 읽기",
@@ -79,9 +77,9 @@ export const MESSAGES = {
   }
 };
 
-export function resolveLanguage(setting, uiLanguage) {
-  if (setting === "ko" || setting === "en") return setting;
-  return String(uiLanguage || "").toLowerCase().startsWith("ko") ? "ko" : "en";
+// English unless Korean was picked in the popup; the browser language is not consulted.
+export function resolveLanguage(setting) {
+  return setting === "ko" ? "ko" : "en";
 }
 
 export function translate(language, key) {

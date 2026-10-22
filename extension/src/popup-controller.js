@@ -1,7 +1,7 @@
 import { createTranslator, resolveLanguage } from "./i18n.js";
 import { loadSettings, normalizeSettings, saveSettings } from "./settings.js";
 
-export function wirePopup(doc, { chrome, uiLanguage, version }) {
+export function wirePopup(doc, { chrome, version }) {
   const storage = chrome.storage.local;
   const permissions = chrome.permissions;
   const nodes = {
@@ -33,7 +33,7 @@ export function wirePopup(doc, { chrome, uiLanguage, version }) {
   }
 
   function paint() {
-    language = resolveLanguage(settings.language, uiLanguage);
+    language = resolveLanguage(settings.language);
     doc.documentElement.lang = language === "ko" ? "ko" : "en";
     for (const [key, node] of Object.entries(nodes)) {
       if (!node || !node.dataset || !node.dataset.i18n) continue;
@@ -45,7 +45,6 @@ export function wirePopup(doc, { chrome, uiLanguage, version }) {
     nodes.enabled.checked = settings.enabled;
     nodes.language.value = settings.language;
     for (const option of nodes.language.options) {
-      if (option.value === "auto") option.textContent = t("languageAuto");
       if (option.value === "ko") option.textContent = t("languageKo");
       if (option.value === "en") option.textContent = t("languageEn");
     }
@@ -72,7 +71,7 @@ export function wirePopup(doc, { chrome, uiLanguage, version }) {
   });
 
   nodes.language.addEventListener("change", async () => {
-    settings = await saveSettings(storage, { ...settings, language: nodes.language.value });
+    settings = await saveSettings(storage, { ...settings, language: nodes.language.value, languageChosen: true });
     paint();
     await paintPermission();
   });

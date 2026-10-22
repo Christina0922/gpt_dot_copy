@@ -21,9 +21,39 @@ export function detectDotScreen(doc) {
   if (!path.startsWith("/dots/")) return { active: false, reason: "not-dot-path" };
   if (typeof doc.querySelector !== "function") return { active: false, reason: "dot-landmarks-missing" };
   const root = doc.querySelector("[data-role='messages-scroll']");
-  const composer = doc.querySelector("[data-role='composer'] [contenteditable='true'][role='textbox']");
-  if (!root || !composer) return { active: false, reason: "dot-landmarks-missing" };
+  const composerArea = doc.querySelector("[data-role='composer']");
+  const composer = composerArea?.querySelector("[contenteditable='true'][role='textbox']");
+  if (!root || !composer) {
+    // Names only which landmark is absent, so a stuck "waiting" can be told apart in the console.
+    const missing = [];
+    if (!root) missing.push("messages-scroll");
+    if (!composerArea) missing.push("composer");
+    else if (!composer) missing.push("composer-textbox");
+    return { active: false, reason: "dot-landmarks-missing", missing };
+  }
   return { active: true, reason: "dot-conversation" };
+}
+
+// The send button's label follows the page language ("Send", "보내기", ...), so it is found by
+// structure first and by label only as a last resort.
+const SEND_BUTTON_SELECTORS = [
+  "button[data-testid='send-button']",
+  "button#composer-submit-button",
+  "button[type='submit']",
+  "button.bg-composer-primary"
+];
+const SEND_LABELS = ["send", "send message", "send prompt", "보내기", "전송", "메시지 보내기"];
+
+export function findSendButton(composerArea) {
+  if (!composerArea || typeof composerArea.querySelector !== "function") return null;
+  for (const selector of SEND_BUTTON_SELECTORS) {
+    const found = composerArea.querySelector(selector);
+    if (found) return found;
+  }
+  for (const button of composerArea.querySelectorAll("button[aria-label]")) {
+    if (SEND_LABELS.includes(button.getAttribute("aria-label").trim().toLowerCase())) return button;
+  }
+  return null;
 }
 
 export const liveAdapter = {
@@ -61,7 +91,7 @@ export const liveAdapter = {
     return { kind: "contenteditable", element };
   },
   composerHasDraft(element) {
-    const send = element?.closest?.("[data-role='composer']")?.querySelector?.("button[aria-label='Send']");
+    const send = findSendButton(element?.closest?.("[data-role='composer']"));
     if (!send) return null;
     return send.disabled !== true && send.getAttribute("aria-disabled") !== "true";
   }

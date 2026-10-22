@@ -3,3 +3,7 @@ dist/
 chrome-smoke-profile/
 *.log
 .DS_Store
+
+# Raw saved Dot pages contain real conversations; only sanitized fixtures belong in the repo.
+/dot-page.html
+/dot-page*.htm

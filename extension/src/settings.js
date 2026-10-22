@@ -1,23 +1,32 @@
 export const DEFAULT_SETTINGS = {
   enabled: true,
-  language: "auto",
+  language: "en",
+  languageChosen: false,
   copyFormat: "text"
 };
 
 export function normalizeSettings(value) {
   const source = value && typeof value === "object" ? value : {};
-  const language = source.language === "ko" || source.language === "en" ? source.language : "auto";
+  // Only a language picked in this version's popup counts; a "ko" saved by an older build without the marker is ignored.
+  const languageChosen = source.languageChosen === true;
+  const language = languageChosen && source.language === "ko" ? "ko" : "en";
   return {
     enabled: source.enabled !== false,
     language,
+    languageChosen,
     copyFormat: source.copyFormat === "markdown" ? "markdown" : "text"
   };
 }
 
-export async function loadSettings(storageArea) {
-  if (!storageArea || typeof storageArea.get !== "function") return { ...DEFAULT_SETTINGS };
+// The value exactly as stored, for the start-up log; null when nothing is stored.
+export async function readStoredSettings(storageArea) {
+  if (!storageArea || typeof storageArea.get !== "function") return null;
   const stored = await storageArea.get("settings");
-  return normalizeSettings(stored && stored.settings);
+  return stored && stored.settings !== undefined ? stored.settings : null;
+}
+
+export async function loadSettings(storageArea) {
+  return normalizeSettings(await readStoredSettings(storageArea));
 }
 
 export async function saveSettings(storageArea, settings) {

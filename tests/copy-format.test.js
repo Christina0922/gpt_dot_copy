@@ -154,7 +154,7 @@ test("a generating reply disables both halves of the split button", () => {
 test("the page remembers the menu choice, and a format change does not rebuild the buttons", async () => {
   const dom = mount();
   const doc = dom.window.document;
-  const chrome = fakeChrome({ enabled: true, language: "ko" });
+  const chrome = fakeChrome({ enabled: true, language: "ko", languageChosen: true });
   const clipboard = createClipboard();
   await startApp({ chrome, window: dom.window, document: doc, adapter: createFixtureAdapter(doc), clipboard });
   const before = slot(doc, "m2");
@@ -186,7 +186,7 @@ test("popup shows and saves the default copy format", async () => {
     contains: async () => false,
     onRemoved: { addListener() {} }
   };
-  await wirePopup(doc, { chrome, uiLanguage: "en", version: "0.2.0" }).init();
+  await wirePopup(doc, { chrome, version: "0.2.0" }).init();
   const select = doc.querySelector("[data-setting='copyFormat']");
   assert.equal(doc.querySelector("[data-i18n='copyFormatLabel']").textContent, MESSAGES.en.copyFormatLabel);
   assert.deepEqual([...select.options].map((option) => option.textContent), [MESSAGES.en.copyFormatText, MESSAGES.en.copyFormatMarkdown]);

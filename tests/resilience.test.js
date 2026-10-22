@@ -18,11 +18,10 @@ function dotPage(count) {
 
 function captureErrors(t) {
   const logged = [];
-  const original = console.error;
+  const originals = { error: console.error, warn: console.warn };
   console.error = (...args) => logged.push(args);
-  t.after(() => {
-    console.error = original;
-  });
+  console.warn = (...args) => logged.push(args);
+  t.after(() => Object.assign(console, originals));
   return logged;
 }
 
