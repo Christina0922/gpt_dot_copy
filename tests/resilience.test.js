@@ -156,7 +156,7 @@ test("a page that keeps removing the button pauses observing instead of looping"
       slot.remove();
     }
   });
-  fighter.observe(body, { childList: true });
+  fighter.observe(body, { childList: true, subtree: true });
   start(dom);
   for (let index = 0; index < 50 && !logged.some((args) => args[1] === "paused"); index += 1) await flush();
   fighter.disconnect();

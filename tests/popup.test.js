@@ -57,8 +57,7 @@ test("popup does not request clipboard permission or read text until the button 
   await popup.init();
   assert.equal(chrome.calls.includes("request"), false);
   assert.equal(reads, 0);
-  // The stored "auto" from 0.1.0 now shows English, even though this used to follow a Korean browser.
-  assert.equal(doc.querySelector("[data-i18n='domUnverified']").textContent.includes("buttons are not added"), true);
+  assert.equal(doc.querySelector("[data-i18n='domUnverified']").textContent, "Copy and paste buttons appear only on a ChatGPT dot conversation page.");
   assert.equal(doc.querySelector("[data-role='version']").textContent, "0.2.0");
   doc.querySelector("[data-action='allow-clipboard']").click();
   await new Promise((resolve) => setTimeout(resolve, 0));

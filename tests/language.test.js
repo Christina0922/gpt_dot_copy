@@ -9,21 +9,21 @@ import { startApp } from "../extension/src/bootstrap.js";
 import { createClipboard, flush, loadDom } from "./helpers/dom.js";
 import { createFixtureAdapter, threadHtml } from "./helpers/fixture.js";
 
-test("display language defaults to English, and old or unknown values fall back to English", () => {
-  assert.equal(normalizeSettings(null).language, "en");
-  for (const stored of ["auto", "ja", "", undefined]) assert.equal(normalizeSettings({ language: stored }).language, "en", String(stored));
+test("display language stays automatic until the popup records a choice", () => {
+  assert.equal(normalizeSettings(null).language, "auto");
+  for (const stored of ["auto", "ja", "", undefined]) assert.equal(normalizeSettings({ language: stored }).language, "auto", String(stored));
+  assert.equal(normalizeSettings({ language: "ko" }).language, "auto");
   assert.equal(normalizeSettings({ language: "ko", languageChosen: true }).language, "ko");
+  assert.equal(normalizeSettings({ language: "en", languageChosen: true }).language, "en");
 });
 
-test("a Korean value saved by an older build, without the popup marker, shows English", () => {
-  assert.equal(normalizeSettings({ language: "ko" }).language, "en");
-  assert.equal(normalizeSettings({ language: "ko", languageChosen: "yes" }).language, "en");
-});
-
-test("only a Korean choice in the popup gives Korean", () => {
-  assert.equal(resolveLanguage("en"), "en");
-  assert.equal(resolveLanguage("ko"), "ko");
-  assert.equal(resolveLanguage(normalizeSettings(null).language), "en");
+test("browser language chooses the display language, and an explicit choice wins", () => {
+  assert.equal(resolveLanguage("auto", "ko-KR"), "ko");
+  assert.equal(resolveLanguage("auto", "ko"), "ko");
+  assert.equal(resolveLanguage("auto", "en-US"), "en");
+  assert.equal(resolveLanguage("auto", "ja"), "en");
+  assert.equal(resolveLanguage("en", "ko-KR"), "en");
+  assert.equal(resolveLanguage("ko", "en-US"), "ko");
 });
 
 function fakeChrome(stored, uiLanguage) {
@@ -44,27 +44,28 @@ async function popupWith(stored, uiLanguage) {
   return doc;
 }
 
-test("a Korean browser still opens the popup in English until Korean is picked", async () => {
+test("the popup follows the browser language until a language is picked", async () => {
   const fresh = await popupWith(undefined, "ko-KR");
-  assert.equal(fresh.documentElement.lang, "en");
-  assert.equal(fresh.querySelector("[data-i18n='languageLabel']").textContent, MESSAGES.en.languageLabel);
+  assert.equal(fresh.documentElement.lang, "ko");
+  assert.equal(fresh.querySelector("[data-i18n='languageLabel']").textContent, MESSAGES.ko.languageLabel);
   const select = fresh.querySelector("[data-setting='language']");
-  assert.equal(select.value, "en");
+  assert.equal(select.value, "ko");
   assert.deepEqual([...select.options].map((option) => option.value), ["en", "ko"]);
 
-  const oldAuto = await popupWith({ language: "auto" }, "ko-KR");
-  assert.equal(oldAuto.documentElement.lang, "en");
+  const japanese = await popupWith(undefined, "ja");
+  assert.equal(japanese.documentElement.lang, "en");
+  assert.equal(japanese.querySelector("[data-setting='language']").value, "en");
 
-  const legacy = await popupWith({ language: "ko" }, "ko-KR");
+  const legacy = await popupWith({ language: "ko" }, "en-US");
   assert.equal(legacy.documentElement.lang, "en");
-  assert.equal(legacy.querySelector("[data-setting='language']").value, "en");
 
   const picked = await popupWith({ language: "ko", languageChosen: true }, "en-US");
   assert.equal(picked.documentElement.lang, "ko");
+  assert.equal(picked.querySelector("[data-i18n='enabledLabel']").textContent, MESSAGES.ko.enabledLabel);
   assert.equal(picked.querySelector("[data-i18n='languageLabel']").textContent, MESSAGES.ko.languageLabel);
 });
 
-async function pageWith(stored) {
+async function pageWith(stored, uiLanguage = "ko-KR") {
   const dom = loadDom(`<div data-fixture="dot-screen">${threadHtml}</div>`);
   const doc = dom.window.document;
   doc.hasFocus = () => true;
@@ -72,7 +73,7 @@ async function pageWith(stored) {
   console.warn = () => {};
   console.info = () => {};
   try {
-    await startApp({ chrome: fakeChrome(stored, "ko-KR"), window: dom.window, document: doc, adapter: createFixtureAdapter(doc), clipboard: createClipboard({ text: "" }) });
+    await startApp({ chrome: fakeChrome(stored, uiLanguage), window: dom.window, document: doc, adapter: createFixtureAdapter(doc), clipboard: createClipboard({ text: "" }) });
   } finally {
     Object.assign(console, originals);
   }
@@ -81,23 +82,23 @@ async function pageWith(stored) {
 
 const labels = (slot) => [...slot.querySelectorAll("[data-dcp-copy]")].map((button) => [button.getAttribute("aria-label"), button.title]);
 
-test("copy icon tooltips and status text follow the same rule on a Korean browser", async () => {
+test("page buttons follow the browser language and a later explicit choice", async () => {
   const doc = await pageWith(undefined);
-  const known = doc.querySelector("[data-fixture-id='m1'] .dcp-copy-slot");
-  assert.deepEqual(labels(known), [[MESSAGES.en.copyAsText, MESSAGES.en.copyAsText], [MESSAGES.en.copyAsMarkdown, MESSAGES.en.copyAsMarkdown]]);
-  assert.deepEqual(labels(doc.querySelector("[data-fixture-id='m5'] .dcp-copy-slot")), labels(known));
-  assert.equal(doc.querySelector("[data-dcp-paste]").textContent, MESSAGES.en.paste);
+  const complete = [[MESSAGES.ko.copy, MESSAGES.ko.copy], [MESSAGES.ko.copyAsMarkdown, MESSAGES.ko.copyAsMarkdown]];
+  const unknown = [[MESSAGES.ko.copyVisible, MESSAGES.ko.copyVisible], [MESSAGES.ko.copyVisibleMarkdown, MESSAGES.ko.copyVisibleMarkdown]];
+  assert.deepEqual(labels(doc.querySelector("[data-fixture-id='m1'] .dcp-copy-slot")), complete);
+  assert.deepEqual(labels(doc.querySelector("[data-fixture-id='m5'] .dcp-copy-slot")), unknown);
+  assert.equal(doc.querySelector("[data-dcp-paste]").textContent, MESSAGES.ko.paste);
   doc.querySelector("[data-dcp-paste]").click();
   await flush();
-  assert.equal(doc.querySelector("[data-dcp-paste]").parentElement.querySelector(".dcp-status").textContent, MESSAGES.en.clipboardEmpty);
+  assert.equal(doc.querySelector("[data-dcp-paste]").parentElement.querySelector(".dcp-status").textContent, MESSAGES.ko.clipboardEmpty);
 
-  const legacy = await pageWith({ language: "ko" });
-  assert.equal(legacy.querySelector("[data-fixture-id='m1'] [data-dcp-copy='text']").getAttribute("aria-label"), MESSAGES.en.copyAsText);
+  const englishBrowser = await pageWith(undefined, "ja");
+  assert.equal(englishBrowser.querySelector("[data-fixture-id='m1'] [data-dcp-copy='text']").textContent, MESSAGES.en.copy);
 
-  const koreanPage = await pageWith({ language: "ko", languageChosen: true });
-  const korean = [[MESSAGES.ko.copyAsText, MESSAGES.ko.copyAsText], [MESSAGES.ko.copyAsMarkdown, MESSAGES.ko.copyAsMarkdown]];
-  assert.deepEqual(labels(koreanPage.querySelector("[data-fixture-id='m1'] .dcp-copy-slot")), korean);
-  assert.deepEqual(labels(koreanPage.querySelector("[data-fixture-id='m5'] .dcp-copy-slot")), korean);
+  const chosenEnglish = await pageWith({ language: "en", languageChosen: true }, "ko-KR");
+  assert.equal(chosenEnglish.querySelector("[data-fixture-id='m1'] [data-dcp-copy='text']").textContent, MESSAGES.en.copy);
+  assert.equal(chosenEnglish.querySelector("[data-fixture-id='m5'] [data-dcp-copy='text']").textContent, MESSAGES.en.copyVisible);
 });
 
 test("picking a language in the popup saves it as a deliberate choice", async () => {
@@ -117,6 +118,32 @@ test("picking a language in the popup saves it as a deliberate choice", async ()
   assert.equal(doc.documentElement.lang, "ko");
 });
 
+test("a saved language change updates buttons already on the page", async () => {
+  const dom = loadDom(`<div data-fixture="dot-screen">${threadHtml}</div>`);
+  const doc = dom.window.document;
+  let stored = { enabled: true, language: "auto" };
+  let listener = null;
+  const chrome = fakeChrome(stored, "en-US");
+  chrome.storage.local.get = async () => ({ settings: stored });
+  chrome.storage.onChanged.addListener = (fn) => {
+    listener = fn;
+  };
+  const originals = { warn: console.warn, info: console.info };
+  console.warn = () => {};
+  console.info = () => {};
+  try {
+    await startApp({ chrome, window: dom.window, document: doc, adapter: createFixtureAdapter(doc), clipboard: createClipboard() });
+    assert.equal(doc.querySelector("[data-fixture-id='m1'] [data-dcp-copy='text']").textContent, MESSAGES.en.copy);
+    stored = { enabled: true, language: "ko", languageChosen: true };
+    listener({ settings: { newValue: stored } }, "local");
+    await flush();
+    assert.equal(doc.querySelector("[data-fixture-id='m1'] [data-dcp-copy='text']").textContent, MESSAGES.ko.copy);
+    assert.equal(doc.querySelectorAll("[data-fixture-id='m1'] [data-dcp-copy='text']").length, 1);
+  } finally {
+    Object.assign(console, originals);
+  }
+});
+
 test("the started line shows the language in use and the stored settings", async () => {
   const dom = loadDom(`<div data-fixture="dot-screen">${threadHtml}</div>`);
   const doc = dom.window.document;
@@ -131,6 +158,6 @@ test("the started line shows the language in use and the stored settings", async
   }
   const started = lines.find((args) => args[1] === "started");
   assert.ok(started);
-  assert.equal(started[2].language, "en");
+  assert.equal(started[2].language, "ko");
   assert.deepEqual(started[2].storedSettings, { language: "ko", enabled: true });
 });

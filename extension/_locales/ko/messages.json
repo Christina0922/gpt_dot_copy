@@ -3,6 +3,6 @@
     "message": "Dot Copy Paste"
   },
   "extDescription": {
-    "message": "테스트 빌드. ChatGPT 닷 대화 화면이 확인되기 전에는 버튼을 표시하지 않습니다."
+    "message": "ChatGPT 닷 메시지를 텍스트나 마크다운으로 복사합니다. 붙여넣기가 실패하면 Ctrl+V를 사용하세요."
   }
 }

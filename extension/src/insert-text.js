@@ -127,6 +127,43 @@ function manualContentEditableInsert(editor, text, doc) {
   return true;
 }
 
+function editorHasText(element, before, text) {
+  const after = element.textContent || "";
+  return after !== before && after.includes(text);
+}
+
+// Some editors insert on a paste event even when the event is not a trusted browser paste.
+// If the editor does not handle it, any accidental DOM change is put back.
+function tryPasteEvent(element, text, doc) {
+  const view = doc.defaultView || globalThis;
+  if (typeof view.DataTransfer !== "function" || typeof view.ClipboardEvent !== "function") return false;
+  let data;
+  try {
+    data = new view.DataTransfer();
+    data.setData("text/plain", text);
+  } catch {
+    return false;
+  }
+  let event;
+  try {
+    event = new view.ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: data });
+  } catch {
+    return false;
+  }
+  if (!event.clipboardData) {
+    try {
+      Object.defineProperty(event, "clipboardData", { configurable: true, value: data });
+    } catch {
+      return false;
+    }
+  }
+  const before = element.textContent || "";
+  const proceeded = element.dispatchEvent(event);
+  if (!proceeded && editorHasText(element, before, text)) return true;
+  if ((element.textContent || "") !== before) element.textContent = before;
+  return false;
+}
+
 function selectEditor(element, caret, doc, empty) {
   element.focus();
   if (empty) {
@@ -143,6 +180,10 @@ function selectEditor(element, caret, doc, empty) {
 function insertContentEditable(element, text, caret, doc) {
   const empty = (element.textContent || "").trim().length === 0;
   selectEditor(element, caret, doc, empty);
+  if (tryPasteEvent(element, text, doc)) {
+    element.focus();
+    return { ok: true, method: "paste-event", undo: "editor" };
+  }
   const before = element.textContent || "";
   let commandWorked = false;
   if (typeof doc.execCommand === "function") {

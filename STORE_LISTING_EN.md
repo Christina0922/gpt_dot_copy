@@ -1,41 +1,37 @@
 # Chrome Web Store listing draft (English)
 
-Status: local draft, superseded by the live Chrome Web Store listing.  
-Live listing (0.1.0, updated 19 October 2026): https://chromewebstore.google.com/detail/dot-copy-paste/ndpennnmcicncopijfkmplbmkndkcdej  
-The live overview starts with “Test build. Buttons stay hidden until a ChatGPT Dot chat page is verified.” That store text is the public listing. Do not treat the paragraphs below as the current store copy.  
-Version: 0.2.0
+Status: local draft for an update to the existing item. Not submitted.  
+Existing item: https://chromewebstore.google.com/detail/dot-copy-paste/ndpennnmcicncopijfkmplbmkndkcdej  
+Published version seen on October 23, 2026: 0.1.0  
+This package: 0.2.1
 
-This extension is not an official OpenAI product and is not affiliated with OpenAI. No user counts, performance claims, or partnership claims are included because none were verified.
+Dot Copy Paste is an independent extension. It is not affiliated with, endorsed by, or sponsored by OpenAI.
 
-## Listing text limited to the verified scope
+## Overview
 
-Dot Copy Paste 0.2.0 is an independently developed Chrome test build. The Dot conversation screen has not been verified, so this version does not show copy or paste buttons on that screen.
+Dot Copy Paste adds copy controls to ChatGPT dot conversations in Chrome.
 
-The popup can turn the feature on or off, choose the language, and show the version. Clipboard reading is an optional permission and is requested only after the popup explains its purpose.
+- Copy a message as plain text.
+- Copy the same message as Markdown from a small MD menu. Headings, lists, links, quotes, code blocks, and tables are kept when the page provides them.
+- The control sits at the end of the message and wraps instead of covering the text.
+- Labels are Korean or English. The extension follows the browser language until you choose one in the popup.
+- Paste is experimental. If the dot composer does not accept the inserted text, the extension restores what you had typed and tells you to use Ctrl+V. It never sends a message for you.
 
-## Permission justifications (for the submission form)
+Conversation and clipboard text stay in the browser. The extension does not send that text to a server or keep a clipboard history. Clipboard reading is optional and happens only when you click Paste.
 
-- `storage`: Stores only the on/off switch and display language in this browser. Conversation content is never stored.
-- `clipboardRead` (optional): Optional. Only if you allow it, the clipboard's plain text is read once, at the moment you click Paste, and placed in the Dot input field. Copy keeps working if you decline or revoke it.
-- chatgpt.com site access: Limits the buttons to chatgpt.com. They run only after a Dot conversation screen is confirmed, and no data is sent anywhere.
+Works on chatgpt.com dot conversations in Chrome. It does not add dot access and does not support the ChatGPT desktop or mobile apps.
 
-## Claims that must not be used yet
+## Permission justifications
 
-- Copies Dot messages
-- Pastes into the Dot input
-- Dot support is complete, or the release is ready
-- Official ChatGPT feature or partnership
-- Unverified user counts or performance claims
+- `storage`: Saves only the on/off switch and language choice in this browser.
+- `clipboardRead` (optional): Reads plain text once, when you click Paste, and only if you allow it. Copy still works if you decline or revoke it.
+- chatgpt.com: The content script is limited to this site and runs only on a recognized dot conversation.
 
-## Still required before submission
+## Not ready to claim
 
-- A public privacy-policy URL. None exists now
-- Screenshots of the real Dot conversation. None exist now
-- A small promotional image. None exists now
-- Verification on a signed-in Dot conversation for copy, paste, and permission allow, deny, and revoke
-- Trademark review
-- A developer account and a final submission ZIP review
+- Paste works in every dot composer
+- Screenshots and a promotional image exist
+- Trademark review is finished
+- This draft has been submitted or reviewed by the Chrome Web Store
 
-The test ZIP is not a submission build:
-
-`D:\1000_b_project\gpt_dot_copy\dist\Dot-Copy-Paste-0.2.0-test.zip`
+Privacy policy text for this version is in `PRIVACY_POLICY.md` in https://github.com/Christina0922/gpt_dot_copy

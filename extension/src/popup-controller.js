@@ -30,8 +30,12 @@ export function wirePopup(doc, { chrome, version }) {
     return createTranslator(language)(key);
   }
 
+  function uiLanguage() {
+    return chrome.i18n?.getUILanguage?.() || "en";
+  }
+
   function paint() {
-    language = resolveLanguage(settings.language);
+    language = resolveLanguage(settings.language, uiLanguage());
     doc.documentElement.lang = language === "ko" ? "ko" : "en";
     for (const [key, node] of Object.entries(nodes)) {
       if (!node || !node.dataset || !node.dataset.i18n) continue;
@@ -41,7 +45,7 @@ export function wirePopup(doc, { chrome, version }) {
     nodes.revoke.textContent = t("revokeClipboard");
     nodes.version.textContent = version;
     nodes.enabled.checked = settings.enabled;
-    nodes.language.value = settings.language;
+    nodes.language.value = language;
     for (const option of nodes.language.options) {
       if (option.value === "ko") option.textContent = t("languageKo");
       if (option.value === "en") option.textContent = t("languageEn");

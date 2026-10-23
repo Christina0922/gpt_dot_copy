@@ -1,39 +1,47 @@
-# Dot Copy Paste privacy policy
+# Privacy Policy — Dot Copy Paste
 
-대상: Dot Copy Paste 0.2.0  
-상태: GitHub에 공개된 문서. Chrome Web Store 등록정보와 로컬 구현을 대조한 수정안.  
-개발 주체: 독립 개발. OpenAI의 공식 제품이나 제휴 제품이 아닙니다.
+Last updated: October 23, 2026
 
-이전 초안의 “닷 대화 구조를 확인하지 못해 버튼을 만들지 않는다”는 문장은 현재 스토어 설명 및 `extension/src/live-adapter.js`와 맞지 않아 아래 내용으로 대체합니다.
+Dot Copy Paste is an independent Chrome extension. It is not an official OpenAI product and is not affiliated with, endorsed by, or sponsored by OpenAI. It adds clipboard controls to supported ChatGPT dot conversation pages.
 
-## 이 버전이 실제로 하는 일
+The archived Word file `Dot_Copy_Paste_Privacy_Policy.docx` is dated October 19, 2026. This page adds the Markdown copy behavior introduced in version 0.2.1. It does not add a new recipient, permission, or stored data type.
 
-콘텐츠 스크립트는 `https://chatgpt.com/*`에 선언되어 있습니다. 복사·붙여넣기 버튼은 ChatGPT 닷 대화 화면이 확인된 뒤에만 넣습니다. 로그인 전 화면과 `/c/` 같은 일반 대화에는 넣지 않습니다.
+## Information the extension handles
 
-Chrome Web Store 개요의 첫 문장은 “Test build. Buttons stay hidden until a ChatGPT Dot chat page is verified.”입니다.
+The extension reads the page structure needed to recognize a ChatGPT dot conversation. When you click Copy, it reads that message body and writes plain text to the clipboard. When you open the Markdown item and click it, it reads the same body and writes Markdown instead. When you click Paste and clipboard reading is available, it reads plain text from the clipboard and tries to insert it into the composer.
 
-사용자가 복사 버튼을 누르기 전에는 해당 메시지 본문을 읽지 않습니다. 버튼을 실행하면 화면에 보이는 해당 메시지 본문만 읽어, 사용자가 고른 형식(일반 텍스트 또는 마크다운)으로 클립보드에 넣습니다.
+Conversation messages and clipboard text may contain personal communications. The extension uses that text only to perform the click you made.
 
-붙여넣기는 스토어 설명과 구현 모두 시험 기능입니다. 버튼을 누르기 전에는 클립보드를 읽지 않습니다. 닷 입력창이 초안을 받지 못하면 삽입을 되돌리고 실패로 표시합니다. 메시지를 자동 전송하지 않습니다.
+## Local processing and storage
 
-기능 사용 여부와 언어만 이 브라우저의 `chrome.storage.local`에 저장합니다. 대화 내용, 클립보드 내용, 계정 정보는 저장하지 않습니다.
+Conversation text and clipboard contents are processed locally in the browser. The extension does not send them to Genius Brain or any other server, and it does not keep a conversation archive or clipboard history.
 
-읽은 대화 본문과 클립보드 텍스트는 버튼 동작을 처리하는 동안만 메모리에서 사용합니다. 확장프로그램 저장소, 파일, 외부 서버로 보내지 않습니다.
+Only the enabled/disabled setting and the language choice are stored in `chrome.storage.local`. If you have not chosen a language, the extension uses the browser language and does not need to store a conversation or clipboard value to do that.
 
-## 권한
+## Permissions
 
-- `storage`: 켜짐/꺼짐, 언어 설정
-- `clipboardRead`: 선택 권한. 팝업에서 목적을 보여 준 뒤 사용자가 허용한 경우에만 붙여넣기에서 사용합니다.
-- chatgpt.com 콘텐츠 스크립트: 버튼을 넣을 페이지를 이 사이트로 제한합니다.
+Site access to `https://chatgpt.com/*` lets the extension find a dot conversation, the message body, and the composer, and show its controls. It does not run on other sites.
 
-분석, 광고, 추적 도구는 없습니다. 원격 코드와 CDN 스크립트는 사용하지 않습니다.
+`storage` keeps the local settings above.
 
-## 연락
+`clipboardRead` stays optional. It is used only after you click Paste. The extension does not watch the clipboard in the background. You can refuse or revoke this permission and still use Copy.
 
-connect.geniusbrain@gmail.com
+## Your choices
 
-공개 GitHub 경로: https://github.com/Christina0922/gpt_dot_copy/blob/main/PRIVACY_POLICY.md
+The extension does not send messages. You decide whether to edit or send text in the composer.
 
-## English summary
+You can disable or remove the extension in Chrome, and you can change its site access and optional permissions there. Text that was copied remains in the system clipboard according to the operating system and other applications. This policy does not control that clipboard history.
 
-Dot Copy Paste 0.2.0 is an independent Chrome extension, not an official or affiliated OpenAI product. The Chrome Web Store overview calls it a test build and says buttons stay hidden until a ChatGPT Dot chat page is verified. Copy reads only the selected visible message after a user click and writes it as plain text or Markdown, as the user chose. Paste is experimental and does not send messages. Settings stay in local `chrome.storage`. Conversation and clipboard text are not sent to an external server.
+If Paste cannot make the dot composer accept the text as a draft, the extension restores the previous composer text and tells you to use Ctrl+V. It does not report that paste as successful.
+
+## Sharing
+
+The extension does not sell user data, share it for advertising, use it for unrelated purposes, or use it to determine creditworthiness or lending eligibility. It has no advertising or analytics trackers and does not load remote code.
+
+ChatGPT is operated by OpenAI. Your use of ChatGPT is subject to OpenAI's policies.
+
+This policy describes the extension. A visit to a website, GitHub, or a support message is handled by that service separately. The Chrome Web Store lists `connect.geniusbrain@gmail.com` as the developer email. Questions about this policy can also be sent through the public repository: https://github.com/Christina0922/gpt_dot_copy
+
+## Changes
+
+This policy will be updated if the extension's data practices change. Any new data handling must be disclosed, and any required consent obtained, before it begins.

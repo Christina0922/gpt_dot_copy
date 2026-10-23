@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { computeAnchorPosition } from "../extension/src/position.js";
+import { computeAnchorPosition, findCopyAnchor } from "../extension/src/position.js";
 import { extractPlainText } from "../extension/src/extract-text.js";
 import { loadDom } from "./helpers/dom.js";
 
@@ -42,6 +42,24 @@ test("hides a message that is fully outside the viewport", () => {
     placement: "inside"
   });
   assert.equal(position.hidden, true);
+});
+
+test("a paragraph keeps the control on its line, and a block ending keeps it underneath", () => {
+  const { window } = loadDom(`
+    <div id="plain"><p>마지막 문장</p></div>
+    <div id="code"><p>앞</p><pre><code>line</code></pre></div>
+    <div id="list"><ul><li>항목</li></ul></div>
+    <div id="quote"><blockquote><p>인용</p></blockquote></div>
+    <div id="table"><table><tr><td>칸</td></tr></table></div>
+  `);
+  const doc = window.document;
+  assert.equal(findCopyAnchor(doc.getElementById("plain")).mode, "inline");
+  assert.equal(findCopyAnchor(doc.getElementById("plain")).anchor.tagName, "P");
+  for (const id of ["code", "list", "quote", "table"]) {
+    const found = findCopyAnchor(doc.getElementById(id));
+    assert.equal(found.mode, "below", id);
+    assert.equal(found.anchor.parentElement.id, id, id);
+  }
 });
 
 test("the copy slot is not part of the copied text", () => {

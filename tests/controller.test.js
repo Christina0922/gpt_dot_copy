@@ -71,8 +71,9 @@ test("unknown generation is labeled and a failed copy is not marked successful",
   controller.start();
   const unknown = doc.querySelector("[data-fixture-id='m5'] [data-dcp-copy='text']");
   assert.equal(unknown.disabled, false);
-  assert.equal(unknown.getAttribute("aria-label"), MESSAGES.ko.copyAsText);
-  assert.equal(unknown.title, MESSAGES.ko.copyAsText);
+  assert.equal(unknown.getAttribute("aria-label"), MESSAGES.ko.copyVisible);
+  assert.equal(unknown.title, MESSAGES.ko.copyVisible);
+  assert.equal(unknown.textContent, MESSAGES.ko.copyVisible);
 
   dom.window.document.execCommand = () => false;
   const clipboard = {

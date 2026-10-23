@@ -46,13 +46,12 @@ test("confirmed Dot landmarks activate copy buttons and leave image-only message
   controller.start();
   assert.equal(doc.querySelectorAll("[data-dcp-copy='text']").length, 2);
   assert.equal(doc.querySelector("[data-message-id='img1'] [data-dcp-copy='text']"), null);
-  assert.equal(doc.querySelector("[data-message-id='u1'] [data-dcp-copy='text']").getAttribute("aria-label"), "텍스트로 복사");
-  // The icon row is the last child of the body whether the text ends in a paragraph or a code block.
+  assert.equal(doc.querySelector("[data-message-id='u1'] [data-dcp-copy='text']").getAttribute("aria-label"), "복사");
   const userSlot = doc.querySelector("[data-message-id='u1'] .dcp-copy-slot");
-  assert.equal(userSlot.parentElement.getAttribute("data-markdown-text-style"), "assistant-message");
-  assert.equal(userSlot.parentElement.lastElementChild, userSlot);
+  assert.equal(userSlot.parentElement.tagName, "P");
+  assert.equal(userSlot.dataset.dcpPlacement, "inline");
   const dotSlot = doc.querySelector("[data-message-id='d1'] .dcp-copy-slot");
-  assert.equal(dotSlot.parentElement.lastElementChild, dotSlot);
+  assert.equal(dotSlot.dataset.dcpPlacement, "below");
   assert.equal(dotSlot.previousElementSibling.tagName, "PRE");
   assert.equal(doc.querySelector("[data-dcp-paste]").textContent, "붙여넣기");
   assert.equal(doc.querySelector("[data-dcp-paste]").parentElement.className, "dcp-anchor");
@@ -61,7 +60,7 @@ test("confirmed Dot landmarks activate copy buttons and leave image-only message
   doc.querySelector("[data-message-id='u1'] [data-markdown-text-style]").append(added);
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(doc.querySelectorAll("[data-message-id='u1'] [data-dcp-copy='text']").length, 1);
-  assert.equal(added.nextElementSibling, doc.querySelector("[data-message-id='u1'] .dcp-copy-slot"));
+  assert.equal(added.lastElementChild, doc.querySelector("[data-message-id='u1'] .dcp-copy-slot"));
 });
 
 test("an empty Dot composer that stays unaccepted is restored", async () => {
@@ -85,6 +84,34 @@ test("an empty Dot composer that stays unaccepted is restored", async () => {
   assert.equal((editor.textContent || "").trim(), "");
   assert.equal(doc.querySelector("[data-dcp-paste]").parentElement.querySelector(".dcp-status").textContent, "입력창이 붙여넣기를 받아들이지 않았습니다. 입력한 내용은 바꾸지 않았습니다.");
   assert.equal(send.disabled, true);
+});
+
+test("an empty Dot composer that enables Send keeps the pasted text", async () => {
+  const dom = loadDom(dotHtml, "https://chatgpt.com/dots/home");
+  const doc = dom.window.document;
+  doc.hasFocus = () => true;
+  const controller = createController({
+    adapter: liveAdapter,
+    document: doc,
+    window: dom.window,
+    clipboard: createClipboard({ text: "DCP-CHECK" }),
+    getLanguage: () => "ko"
+  });
+  controller.start();
+  const editor = doc.querySelector("[contenteditable='true']");
+  const send = doc.querySelector("button[aria-label='Send']");
+  send.disabled = true;
+  editor.addEventListener("beforeinput", () => {
+    send.disabled = false;
+  });
+  editor.addEventListener("input", () => {
+    send.disabled = false;
+  });
+  doc.querySelector("[data-dcp-paste]").click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(editor.textContent, "DCP-CHECK");
+  assert.equal(send.disabled, false);
+  assert.equal(doc.querySelector(".dcp-anchor .dcp-status").textContent, "붙여넣음");
 });
 
 test("a normal ChatGPT path does not receive Dot buttons", () => {

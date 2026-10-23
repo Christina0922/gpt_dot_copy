@@ -213,6 +213,22 @@ test("Markdown escapes only where text would turn into syntax", () => {
 | a \| b ` + "`c\\|d`" + String.raw` |`);
 });
 
+test("a code fence grows past backticks inside the code, and a quote stays a quote", () => {
+  const { window } = loadDom(`
+    <div id="body">
+      <pre><code class="language-js">const mark = "\`\`\`";</code></pre>
+      <blockquote><p>인용 문장</p></blockquote>
+      <button type="button">Reply</button>
+      <time>1:00</time>
+    </div>
+  `);
+  const markdown = extractMarkdown(window.document.getElementById("body"));
+  assert.equal(markdown.includes("Reply"), false);
+  assert.equal(markdown.includes("1:00"), false);
+  assert.match(markdown, /^````js\nconst mark = "```";\n````/);
+  assert.match(markdown, /\n> 인용 문장$/);
+});
+
 test("Markdown links keep only web and mail addresses", () => {
   const { window } = loadDom(`
     <div id="body"><p><a href="javascript:alert(1)">스크립트</a> <a href="https://example.com/a b">공백 주소</a> <a href="mailto:a@example.com">메일</a></p></div>

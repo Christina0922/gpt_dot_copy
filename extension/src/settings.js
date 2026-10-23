@@ -1,18 +1,16 @@
 export const DEFAULT_SETTINGS = {
   enabled: true,
-  language: "en",
+  language: "auto",
   languageChosen: false
 };
 
 export function normalizeSettings(value) {
   const source = value && typeof value === "object" ? value : {};
-  // Only a language picked in this version's popup counts; a "ko" saved by an older build without the marker is ignored.
-  const languageChosen = source.languageChosen === true;
-  const language = languageChosen && source.language === "ko" ? "ko" : "en";
+  const explicit = source.languageChosen === true && (source.language === "ko" || source.language === "en");
   return {
     enabled: source.enabled !== false,
-    language,
-    languageChosen
+    language: explicit ? source.language : "auto",
+    languageChosen: explicit
   };
 }
 

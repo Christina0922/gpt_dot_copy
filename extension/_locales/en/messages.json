@@ -3,6 +3,6 @@
     "message": "Dot Copy Paste"
   },
   "extDescription": {
-    "message": "Test build. Buttons stay hidden until a ChatGPT Dot chat page is verified."
+    "message": "Copy ChatGPT dot messages as text or Markdown. Paste may fail; use Ctrl+V in the composer."
   }
 }

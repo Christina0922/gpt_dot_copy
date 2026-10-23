@@ -1,10 +1,14 @@
 export const MESSAGES = {
   en: {
     copyBusy: "You can copy after the reply finishes",
+    copy: "Copy",
+    copyVisible: "Copy visible text",
     copyAsText: "Copy as text",
     copyAsMarkdown: "Copy as Markdown",
+    copyVisibleMarkdown: "Copy visible text as Markdown",
+    copyMenu: "Markdown",
     paste: "Paste",
-    copied: "Copied",
+    copied: "Copied!",
     pasted: "Pasted",
     copyFailed: "Couldn't copy. Try again, or select the text and press Ctrl+C.",
     clipboardDenied: "The clipboard could not be read. Use Ctrl+V in the input field.",
@@ -26,13 +30,17 @@ export const MESSAGES = {
     clipboardRequestFailed: "The permission request did not finish. Copy still works, and you can use Ctrl+V in the input field.",
     unofficial: "Independently developed extension. Not an official OpenAI product.",
     versionLabel: "Version",
-    domUnverified: "The Dot conversation screen has not been verified, so buttons are not added to the page.",
+    domUnverified: "Copy and paste buttons appear only on a ChatGPT dot conversation page.",
     trademark: "The public product name and trademark review are not finished. Dot Copy Paste is the working name."
   },
   ko: {
     copyBusy: "답변이 끝난 뒤 복사할 수 있습니다",
+    copy: "복사",
+    copyVisible: "현재 표시된 내용 복사",
     copyAsText: "텍스트로 복사",
     copyAsMarkdown: "마크다운으로 복사",
+    copyVisibleMarkdown: "현재 표시된 내용을 마크다운으로 복사",
+    copyMenu: "마크다운",
     paste: "붙여넣기",
     copied: "복사됨",
     pasted: "붙여넣음",
@@ -56,14 +64,15 @@ export const MESSAGES = {
     clipboardRequestFailed: "권한 요청이 끝나지 않았습니다. 복사는 계속 사용할 수 있고, 입력창에서 Ctrl+V를 사용할 수 있습니다.",
     unofficial: "독립적으로 개발된 확장프로그램입니다. OpenAI의 공식 제품이 아닙니다.",
     versionLabel: "버전",
-    domUnverified: "닷 대화 화면이 아직 확인되지 않아 페이지에 버튼을 넣지 않습니다.",
+    domUnverified: "복사·붙여넣기 버튼은 ChatGPT 닷 대화 화면에만 나타납니다.",
     trademark: "공개 제품명과 상표 검토는 끝나지 않았습니다. Dot Copy Paste는 작업명입니다."
   }
 };
 
-// English unless Korean was picked in the popup; the browser language is not consulted.
-export function resolveLanguage(setting) {
-  return setting === "ko" ? "ko" : "en";
+// An explicit popup choice wins. Otherwise Korean browser languages use Korean, and every other language uses English.
+export function resolveLanguage(setting, uiLanguage = "en") {
+  if (setting === "ko" || setting === "en") return setting;
+  return /^ko\b/i.test(String(uiLanguage || "")) ? "ko" : "en";
 }
 
 export function translate(language, key) {

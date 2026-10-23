@@ -34,7 +34,7 @@ export function startApp({
         version,
         build,
         reason: result.reason,
-        language: resolveLanguage(settings.language),
+        language: resolveLanguage(settings.language, uiLanguage()),
         storedSettings,
         waitedMs
       });
@@ -49,6 +49,10 @@ export function startApp({
       waitStartedAt = null;
     }
     return result;
+  }
+
+  function uiLanguage() {
+    return chrome.i18n?.getUILanguage?.() || view.navigator?.language || "en";
   }
 
   function now() {
@@ -83,7 +87,7 @@ export function startApp({
       document: doc,
       window: view,
       clipboard,
-      getLanguage: () => resolveLanguage(settings.language)
+      getLanguage: () => resolveLanguage(settings.language, uiLanguage())
     });
     return startController();
   }

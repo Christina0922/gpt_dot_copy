@@ -58,131 +58,62 @@
   pointer-events: none;
 }
 
-/* Fallback when a message has no action row: the icons take the last line inside the bubble. */
+/* In normal flow after the message text. A paragraph shares the line; a block ending uses "below". */
 .dcp-copy-slot {
-  display: flex;
+  display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
   gap: 4px;
-  width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
-  margin: 6px 0 0;
+  margin: 0 0 0 0.4rem;
   padding: 0;
+  vertical-align: baseline;
+  position: relative;
   pointer-events: none;
+}
+
+.dcp-copy-slot[data-dcp-placement="below"] {
+  display: flex;
+  width: fit-content;
+  margin: 0.35rem 0 0;
 }
 
 .dcp-copy-slot[data-dcp-author="user"] {
   justify-content: flex-end;
 }
 
-/* Normal placement: inside the action row beside reply and reaction, outside the bubble.
-   Hidden like those icons until the message is hovered or focused. Opacity (not display or
-   visibility) hides it, so Tab still reaches the buttons, and "visible" keeps them focusable
-   even when the page hides the row with visibility. */
-.dcp-copy-slot[data-dcp-mode="actions"] {
-  display: inline-flex;
-  flex-wrap: nowrap;
-  flex: none;
-  gap: 0;
-  width: auto;
-  margin: 0;
-  visibility: visible;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-
-article:hover .dcp-copy-slot[data-dcp-mode="actions"],
-.dcp-copy-slot[data-dcp-mode="actions"]:focus-within {
-  opacity: 1;
-}
-
-/* A keyboard user on one of the icons needs the whole row shown, even if the page hides it. */
-:has(> .dcp-copy-slot[data-dcp-mode="actions"]:focus-within) {
-  opacity: 1 !important;
-  visibility: visible !important;
-}
-
-/* No mouse to hover with: always show the icons (and the row they sit in). */
-@media (hover: none) {
-  .dcp-copy-slot[data-dcp-mode="actions"] {
-    opacity: 1;
-  }
-
-  :has(> .dcp-copy-slot[data-dcp-mode="actions"]) {
-    opacity: 1 !important;
-    visibility: visible !important;
-  }
-}
-
-/* Plain gray icons without a box, like the page's reply and reaction icons; the controller copies
-   their button size when it can, and 28px is the fallback. */
-.dcp-icon-btn {
+.dcp-menu-btn {
   pointer-events: auto;
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  width: 28px;
-  height: 28px;
   margin: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--dcp-icon);
+  border: 1px solid var(--dcp-border);
+  border-radius: 999px;
+  background: var(--dcp-bg);
+  color: var(--dcp-fg);
+  font: 700 0.65rem/1 system-ui, sans-serif;
+  padding: 0.2rem 0.4rem;
+  min-height: 1.75rem;
   cursor: pointer;
 }
 
-.dcp-icon-btn:hover {
-  color: var(--dcp-icon-hover);
-  background: var(--dcp-icon-hover-bg);
+.dcp-menu {
+  position: absolute;
+  z-index: 2;
+  top: calc(100% + 4px);
+  left: 0;
+  display: flex;
+  min-width: 12rem;
+  max-width: min(18rem, 80vw);
+  pointer-events: auto;
 }
 
-.dcp-icon-btn:focus-visible {
-  color: var(--dcp-icon-hover);
-  outline: 2px solid var(--dcp-focus);
-  outline-offset: -2px;
+.dcp-menu[hidden] {
+  display: none;
 }
 
-.dcp-icon-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.dcp-icon-btn[data-dcp-result="success"] {
-  color: var(--dcp-success);
-}
-
-.dcp-icon-btn[data-dcp-result="error"] {
-  color: var(--dcp-error);
-}
-
-.dcp-icon {
-  display: block;
-  flex: none;
-  width: 16px;
-  height: 16px;
-}
-
-/* In the bubble fallback a failure message gets its own line under the icons. In the action row
-   it would crowd the reply and reaction icons, so there it is only announced, and the warning
-   icon's tooltip carries it. "Copied" is only announced in both, since the check shows it. */
 .dcp-copy-slot .dcp-status {
   flex-basis: 100%;
-}
-
-.dcp-copy-slot .dcp-status[data-dcp-state="success"],
-.dcp-copy-slot[data-dcp-mode="actions"] .dcp-status {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  padding: 0;
-  border: 0;
 }
 
 .dcp-btn {
@@ -203,9 +134,23 @@ article:hover .dcp-copy-slot[data-dcp-mode="actions"],
   box-shadow: 0 1px 2px var(--dcp-shadow);
 }
 
-.dcp-btn:focus {
+.dcp-btn:focus,
+.dcp-btn:focus-visible,
+.dcp-menu-btn:focus,
+.dcp-menu-btn:focus-visible {
   outline: 2px solid var(--dcp-focus);
   outline-offset: 2px;
+}
+
+.dcp-copy-slot .dcp-btn {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+
+.dcp-menu-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .dcp-btn:disabled {
