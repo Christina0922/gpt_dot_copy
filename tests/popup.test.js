@@ -55,13 +55,13 @@ test("popup has no clipboard permission menu and does not start a payment", asyn
   let asked = 0;
   const popup = wirePopup(doc, {
     chrome,
-    version: "0.2.4",
+    version: "0.2.5",
     askPage() {
       asked += 1;
       return { ok: true, code: "exported-full" };
     },
     licenseRequest() {
-      throw new Error("network");
+      return { source: "server", entitled: false, state: "not-purchased", productId: "dot-copy-paste-export" };
     }
   });
   await popup.init();
@@ -72,11 +72,12 @@ test("popup has no clipboard permission menu and does not start a payment", asyn
   assert.equal(chrome.calls.includes("request"), false);
   assert.equal(chrome.calls.includes("remove"), false);
   assert.equal(doc.querySelector("[data-i18n='domUnverified']").textContent, "Copy and paste buttons appear only on a ChatGPT dot conversation page.");
-  assert.equal(doc.querySelector("[data-role='version']").textContent, "0.2.4");
+  assert.equal(doc.querySelector("[data-role='version']").textContent, "0.2.5");
   assert.equal(doc.querySelector("[data-action='buy-pro']").disabled, true);
   assert.equal(doc.querySelector("[data-action='buy-pro']").textContent, "Sale in preparation");
   assert.equal(doc.querySelector("[data-i18n='proPrice']").textContent, "Buy Pro — one-time KRW 4,900. There is no monthly subscription and no automatic renewal. Later features are not included.");
-  assert.equal(doc.querySelector("[data-role='purchase-status']").textContent, "Sale in preparation");
+  assert.equal(doc.querySelector("[data-role='purchase-status']").textContent, "No purchase was confirmed for this account.");
+  assert.equal(doc.querySelector("[data-action='restore-purchase']").getAttribute("href"), "https://dot-copy-paste.vercel.app/restore");
   assert.equal(asked, 0);
   doc.querySelector("[data-action='export']").click();
   await new Promise((resolve) => setTimeout(resolve, 0));

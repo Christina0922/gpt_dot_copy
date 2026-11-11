@@ -75,6 +75,12 @@ test("loaded Korean, English, code, table, and long threads keep order and do no
   assert.equal(markdown.filename, "내-하인-2026-11-11.md");
   const positions = ["긴 문장 0", "긴 문장 19"].map((text) => markdown.text.indexOf(text));
   assert.equal(positions[0] < positions[1], true);
+  assert.equal(collected.messages.length, 24);
+  const headings = markdown.text.match(/^## \d+\. /gm) || [];
+  assert.equal(headings.length, 24);
+  assert.equal(new Set(headings).size, 24);
+  assert.equal(markdown.text.includes("긴 문장 7"), true);
+  assert.equal(markdown.text.includes("긴 문장 20"), false);
 
   const english = buildConversationExport({ ...collected, exportedAt, language: "en", format: "txt", scope: "loaded", reason: "no-confirmed-total" });
   assert.equal(english.text.startsWith("Export of messages loaded on screen\n"), true);

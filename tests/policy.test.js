@@ -9,11 +9,11 @@ const root = new URL("../extension/", import.meta.url);
 test("manifest is MV3 and limited to chatgpt.com", () => {
   const manifest = JSON.parse(readFileSync(new URL("manifest.json", root), "utf8"));
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, "0.2.4");
+  assert.equal(manifest.version, "0.2.5");
   assert.deepEqual(manifest.permissions, ["storage"]);
   assert.equal(manifest.optional_permissions, undefined);
   assert.equal(JSON.stringify(manifest).includes("clipboardRead"), false);
-  assert.equal(manifest.host_permissions, undefined);
+  assert.deepEqual(manifest.host_permissions, ["https://dot-copy-paste.vercel.app/*"]);
   assert.deepEqual(manifest.content_scripts[0].matches, ["https://chatgpt.com/*"]);
   assert.deepEqual(manifest.content_scripts[0].js, ["content/content.js"]);
   assert.equal(manifest.content_scripts[0].type, undefined);
@@ -60,8 +60,11 @@ test("extension source does not send or render user text unsafely", () => {
     assert.equal(source.includes(forbidden), false, forbidden);
   }
   const popup = readFileSync(new URL("popup/popup.js", root), "utf8");
-  assert.equal(popup.includes("fetch("), false);
+  assert.equal(popup.includes("fetch("), true);
   assert.equal(popup.includes("localhost"), false);
+  assert.equal(popup.includes("paddle.com"), false);
+  assert.equal(popup.includes("sk_live"), false);
+  assert.equal(popup.includes("whsec_"), false);
   assert.equal(popup.includes("chrome.tabs.query"), true);
   assert.equal(popup.includes("chrome.tabs.sendMessage"), true);
   assert.equal(JSON.stringify(JSON.parse(readFileSync(new URL("manifest.json", root), "utf8"))).includes("tabs"), false);
