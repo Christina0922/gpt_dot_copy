@@ -63,6 +63,7 @@ export function applyDecision(store, decision) {
       productId: decision.catalogProductId || decision.productId,
       amount: decision.amount,
       currency: decision.currency,
+      environment: decision.environment === "live" ? "live" : "sandbox",
       status: effect.full ? "refunded" : "active",
       refundedAmount: effect.amount
     });
@@ -96,19 +97,25 @@ export function statusForToken(store, token) {
   if (!account) return { entitled: false, state: "not-purchased", source: "server" };
   const record = store.purchases.get(store.byAccount.get(account.accountId));
   if (!record) return { entitled: false, state: "not-purchased", source: "server", productId: "dot-copy-paste-export" };
+  return purchaseStatus(record);
+}
+
+export function purchaseStatus(record) {
+  const channel = record.environment === "live" ? "live" : "sandbox";
   if (record.status === "refunded") {
-    return { entitled: false, state: "refunded", source: "server", productId: record.productId, refund: "full" };
+    return { entitled: false, state: "refunded", source: "server", productId: record.productId, refund: "full", channel };
   }
-  return {
-    entitled: true,
-    state: "entitled",
+  const body = {
     source: "server",
     productId: record.productId,
     amount: record.amount,
     currency: record.currency,
     refund: record.refundedAmount > 0 ? "partial" : "none",
-    refundedAmount: record.refundedAmount || 0
+    refundedAmount: record.refundedAmount || 0,
+    channel
   };
+  if (channel !== "live") return { ...body, entitled: false, state: "sandbox" };
+  return { ...body, entitled: true, state: "entitled" };
 }
 
 function adjustmentDecision(decision, data, expected) {

@@ -1,6 +1,6 @@
 # Payments
 
-Dot Copy Paste does not open a live payment in version 0.2.6. The purchase button says the sale is in preparation and does not open a payment page. The license server is `https://dot-copy-paste.vercel.app`. It is a separate Vercel project named `dot-copy-paste`. It does not use the AI Status Monitor project or `geniusbrain.works`.
+Dot Copy Paste does not open a live payment in version 0.2.7. The purchase button says the sale is in preparation and does not open a payment page. The license server is `https://dot-copy-paste.vercel.app`. It is a separate Vercel project named `dot-copy-paste`. It does not use the AI Status Monitor project or `geniusbrain.works`.
 
 Another extension in the same workspace, AI Status Monitor, uses Paddle for a different one-time product priced in USD. That product, price, webhook, and license host are not reused here. This repository has no Paddle product for a one-time KRW 4,900 export.
 
@@ -45,6 +45,14 @@ Server-only environment variables:
 
 Subscribe the sandbox notification destination to `transaction.completed`, `adjustment.created`, and `adjustment.updated`. Do not subscribe to `transaction.refunded`. A refund removes access only when the adjustment action is `refund`, the status is `approved`, the currency matches, and the adjustment is for this product. `pending_approval` and `rejected` do not remove access. A partial refund keeps the purchase. A full refund, or partial refunds that add up to the full KRW 4900, removes it. An older notice does not overwrite a newer one. Live sale still needs a separate live product, API key, webhook secret, and price check.
 
-The provider transaction lookup origin in server code is `https://api.paddle.com`. The extension package does not include that origin, a checkout URL, or any of the secret values.
+The provider transaction lookup origin in server code is `https://api.paddle.com`. The extension package does not include that origin, a checkout URL, or any of the secret values. The setup tool calls only `https://sandbox-api.paddle.com`. A live key stops the tool before any request, including a live API request.
+
+## Rollback
+
+Before a production deploy, `GET https://dot-copy-paste.vercel.app/api/health` should report `sale: preparing` and `database: postgres`. After the deploy, check the same endpoint again. Sale stays `preparing`. To return to the previous server build, redeploy that deployment URL with `vercel redeploy <previous-production-url> --target production`. Do not delete or replace the database environment variables while rolling back.
+
+## Mail password
+
+The server reads `DCP_EMAIL_SMTP_HOST` (default `smtp.gmail.com`), `DCP_EMAIL_SMTP_PORT` (default `465`, implicit TLS), `DCP_EMAIL_FROM`, and `DCP_EMAIL_SMTP_PASSWORD`. It does not read `DCP_EMAIL_API_KEY`. If the password is missing, add `DCP_EMAIL_SMTP_PASSWORD` for Production and Preview at Vercel → the `dot-copy-paste` project → Settings → Environment Variables. The value is the Gmail app password from Google Account → Security → 2-Step Verification → App passwords. Do not paste it into chat. No restore message is sent unless a test recipient was named.
 
 Sale stays closed until the live dot page can prove a full thread, the price and currency are confirmed, and the signed webhook or provider lookup path is verified against that price. A browser success page does not grant Pro.

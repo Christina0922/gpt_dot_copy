@@ -15,8 +15,9 @@ export function createLicenseHandler({ runtime = { kind: "missing" }, env = {}, 
     if (body.length > MAX_BODY) return json(413, { ok: false, state: "unavailable" });
 
     if (method === "GET" && path === "/api/health") return health(runtime, env);
-    if (method === "POST" && path === "/api/session") return createSession(runtime);
-    if (method === "GET" && path === "/api/status") return readStatus(runtime, headers);
+    if (method === "POST" && path === "/api/session") return createSession(runtime, now);
+    if (method === "GET" && path === "/api/status") return readStatus(runtime, headers, now);
+    if (method === "POST" && path === "/api/logout") return logout(runtime, headers);
     if (method === "POST" && path === "/api/webhook") return webhook(runtime, env, headers, body, now);
     if (method === "POST" && path === "/api/restore") return restore(runtime, env, headers, body, now, mailer);
     if (method === "GET" && (path === "/api/restore/consume" || path === "/api/consume")) return consume(runtime, request?.path || "", now);
@@ -70,26 +71,46 @@ function healthBody(runtime, env, database) {
   };
 }
 
-async function createSession(runtime) {
+async function createSession(runtime, now) {
   if (!ready(runtime)) return json(503, { ok: false, state: "unavailable" });
   try {
-    const account = await runtime.createAccount();
+    const account = await runtime.createAccount(now());
     return json(200, { accountId: account.accountId, token: account.token });
   } catch {
     return json(503, { ok: false, state: "unavailable" });
   }
 }
 
-async function readStatus(runtime, headers) {
+async function readStatus(runtime, headers, now) {
   if (!ready(runtime)) return json(503, { entitled: false, state: "unavailable", source: "server" });
   const token = bearer(headers.authorization) || readCookie(headers.cookie, "dcp_session");
   if (!token) return json(401, { entitled: false, state: "unauthorized", source: "server" });
   try {
-    const result = await runtime.readStatus(token);
+    const result = await runtime.readStatus(token, now());
     return json(result.status, result.body);
   } catch {
     return json(503, { entitled: false, state: "unavailable", source: "server" });
   }
+}
+
+async function logout(runtime, headers) {
+  const token = bearer(headers.authorization) || readCookie(headers.cookie, "dcp_session");
+  if (ready(runtime) && token) {
+    try {
+      await runtime.revokeSession(token);
+    } catch {
+      return json(503, { ok: false, state: "unavailable" });
+    }
+  }
+  return {
+    status: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      "set-cookie": "dcp_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0"
+    },
+    body: { ok: true }
+  };
 }
 
 async function webhook(runtime, env, headers, body, now) {
@@ -104,6 +125,11 @@ async function webhook(runtime, env, headers, body, now) {
   }
   try {
     const decision = interpretNotification(notification, expectedFromEnv(env));
+    const channel = env.DCP_PADDLE_ENV === "live" || env.DCP_PADDLE_ENV === "sandbox" ? env.DCP_PADDLE_ENV : "";
+    if (decision.action === "grant") {
+      if (!channel) decision.action = "ignore";
+      else decision.environment = channel;
+    }
     const result = await runtime.applyNotification(decision, notification?.data?.customer?.email || "");
     return json(200, { granted: result.granted === true, duplicate: result.duplicate === true });
   } catch {
@@ -116,6 +142,8 @@ async function restore(runtime, env, headers, body, now, mailer) {
   if (!ready(runtime)) return restoreResult(form, 503, { sent: false, reason: "unavailable" });
   const email = readEmail(body, headers["content-type"] || "");
   try {
+    const allowed = await runtime.allowRestore({ email, ip: clientIp(headers), now: now() });
+    if (!allowed) return restoreResult(form, 429, { sent: false, reason: "limited" });
     const accountId = await runtime.accountIdForEmail(email);
     if (!accountId) return restoreResult(form, 200, { sent: false, reason: "not-purchased" });
     const issued = await runtime.issueLink({ accountId, email, now: now() });
@@ -194,7 +222,9 @@ function restoreResult(form, status, body) {
   if (!form) return json(status, body);
   const message = body.sent === true
     ? "복원 링크를 보냈습니다."
-    : body.reason === "not-purchased"
+      : body.reason === "limited"
+        ? "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요. 메일은 보내지 않았습니다."
+      : body.reason === "not-purchased"
       ? "이 이메일로 확인된 구매가 없습니다. 메일을 보내지 않았습니다."
       : "메일을 보내지 못했습니다.";
   return html(status, `<!doctype html><html lang="ko"><meta charset="utf-8"><title>구매 복원</title><p>${message}</p><p><a href="/restore">돌아가기</a></p>`);
@@ -218,6 +248,13 @@ function readEmail(body, contentType) {
   } catch {
     return "";
   }
+}
+
+function clientIp(headers) {
+  const forwarded = headers["x-forwarded-for"] || "";
+  const first = forwarded.split(",")[0].trim();
+  if (!first || first.length > 80 || /[\r\n]/.test(first)) return "";
+  return first;
 }
 
 function bearer(authorization) {

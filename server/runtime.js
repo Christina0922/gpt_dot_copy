@@ -1,5 +1,5 @@
-import { createAccount, accountFromToken, createMemoryStore } from "./accounts.js";
-import { accountIdForEmail, consumeLoginLink, emailHash, issueLoginLink } from "./login.js";
+import { createAccount, accountFromToken, createMemoryStore, revokeToken } from "./accounts.js";
+import { accountIdForEmail, allowRestoreAttempt, consumeLoginLink, emailHash, issueLoginLink } from "./login.js";
 import { applyDecision, statusForToken } from "./purchase.js";
 import { createPostgresStore } from "./postgres.js";
 
@@ -8,15 +8,23 @@ export function createMemoryRuntime() {
   return {
     kind: "memory",
     store,
-    async createAccount() {
-      return createAccount(store);
+    async createAccount(now = Date.now()) {
+      return createAccount(store, undefined, now);
     },
-    async readStatus(token) {
+    async readStatus(token, now = Date.now()) {
       if (store.failReads) return { status: 503, body: { entitled: false, state: "unavailable", source: "server" } };
-      if (!accountFromToken(store, token)) {
+      const account = accountFromToken(store, token);
+      if (!account || account.expiresAt == null || account.expiresAt <= now) {
+        if (account) revokeToken(store, token);
         return { status: 401, body: { entitled: false, state: "unauthorized", source: "server" } };
       }
       return { status: 200, body: statusForToken(store, token) };
+    },
+    async revokeSession(token) {
+      return revokeToken(store, token);
+    },
+    async allowRestore(input) {
+      return allowRestoreAttempt(store, input);
     },
     async applyNotification(decision, email) {
       const result = applyDecision(store, decision);

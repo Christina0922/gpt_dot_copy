@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.7
+
+- A Sandbox purchase is stored separately and does not become a live entitlement. Logout removes only that browser session, sessions expire after 30 days, and restore requests are rate limited.
+- The Sandbox setup tool stops when it sees a live key and does not call the live Paddle API. It reuses an existing Dot Copy Paste product instead of creating a duplicate.
+
 ## 0.2.6
 
 - The popup uses a white background, blue accents, and separate sections for basic features, export, and purchase.

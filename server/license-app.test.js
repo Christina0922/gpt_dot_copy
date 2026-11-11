@@ -37,7 +37,7 @@ function post(api, body, signedAt = now) {
   return api.webhook({ rawBody, header: signBody(rawBody, secret, signedAt) });
 }
 
-test("test payment grants one entitlement and ignores failure, tampering, duplicates, and email claims", async () => {
+test("test payment is stored once but is not a live entitlement", async () => {
   const { store, api } = app();
   const buyer = api.createSession();
   const other = api.createSession();
@@ -65,11 +65,13 @@ test("test payment grants one entitlement and ignores failure, tampering, duplic
   assert.equal(api.statusByEmail().status, 401);
   assert.equal(api.status(`Bearer ${other.token}`).body.state, "not-purchased");
   const active = api.status(`Bearer ${buyer.token}`).body;
-  assert.equal(active.entitled, true);
+  assert.equal(active.entitled, false);
+  assert.equal(active.state, "sandbox");
   assert.equal(active.amount, 4900);
   assert.equal(active.currency, "KRW");
   assert.equal(JSON.stringify(active).includes("other@example.com"), false);
-  assert.equal(mayExport(entitlementFromServer(active)), true);
+  assert.equal(JSON.stringify(active).includes(buyer.token), false);
+  assert.equal(mayExport(entitlementFromServer(active)), false);
   assert.equal(mayExport({ entitled: true, state: "entitled", source: "local" }), false);
 });
 
@@ -83,7 +85,7 @@ test("refund updates the buyer only, and a store outage does not revoke the purc
   assert.equal(down.body.state, "unavailable");
   assert.equal(store.purchases.get("txn_1").status, "active");
   store.failReads = false;
-  assert.equal(api.status(`Bearer ${buyer.token}`).body.state, "entitled");
+  assert.equal(api.status(`Bearer ${buyer.token}`).body.state, "sandbox");
 
   const refund = post(api, {
     event_id: "evt_refund",

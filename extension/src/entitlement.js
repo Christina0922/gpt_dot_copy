@@ -28,6 +28,9 @@ export function entitlementFromServer(body) {
   if (body.state === "unauthorized") {
     return { entitled: false, state: "unauthorized", source: "server" };
   }
+  if (body.state === "sandbox") {
+    return { entitled: false, state: "sandbox", source: "server" };
+  }
   const matches = body.entitled === true
     && body.state === "entitled"
     && body.productId === PRODUCT_ID
@@ -62,6 +65,8 @@ export function statusMessageKey(entitlement, { saleOpen = false } = {}) {
       return "purchaseNone";
     case "unauthorized":
       return "purchaseSignIn";
+    case "sandbox":
+      return "purchaseSandbox";
     case "refunded":
       return "purchaseRefunded";
     case "sale-closed":

@@ -9,7 +9,7 @@ const root = new URL("../extension/", import.meta.url);
 test("manifest is MV3 and limited to chatgpt.com", () => {
   const manifest = JSON.parse(readFileSync(new URL("manifest.json", root), "utf8"));
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, "0.2.6");
+  assert.equal(manifest.version, "0.2.7");
   assert.deepEqual(manifest.permissions, ["storage"]);
   assert.equal(manifest.optional_permissions, undefined);
   assert.equal(JSON.stringify(manifest).includes("clipboardRead"), false);

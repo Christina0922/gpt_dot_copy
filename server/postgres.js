@@ -1,9 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
 import { neon } from "@neondatabase/serverless";
-import { createMemoryStore } from "./accounts.js";
-import { emailHash } from "./login.js";
-import { LOGIN_LINK_TTL_MS } from "./login.js";
-import { applyDecision } from "./purchase.js";
+import { createMemoryStore, SESSION_TTL_MS } from "./accounts.js";
+import { LOGIN_LINK_TTL_MS, RESTORE_EMAIL_LIMIT, RESTORE_IP_LIMIT, RESTORE_WINDOW_MS, emailHash } from "./login.js";
+import { applyDecision, purchaseStatus } from "./purchase.js";
 
 const PRODUCT_ID = "dot-copy-paste-export";
 
@@ -15,7 +14,8 @@ export function createPostgresStore(databaseUrl) {
   async function ensureSchema() {
     if (!schema) {
       schema = (async () => {
-        await sql`CREATE TABLE IF NOT EXISTS dcp_accounts (token_hash text PRIMARY KEY, account_id text NOT NULL)`;
+        await sql`CREATE TABLE IF NOT EXISTS dcp_accounts (token_hash text PRIMARY KEY, account_id text NOT NULL, expires_at timestamptz)`;
+        await sql`ALTER TABLE dcp_accounts ADD COLUMN IF NOT EXISTS expires_at timestamptz`;
         await sql`CREATE INDEX IF NOT EXISTS dcp_accounts_account ON dcp_accounts (account_id)`;
         await sql`CREATE TABLE IF NOT EXISTS dcp_emails (account_id text PRIMARY KEY, email_hash text UNIQUE NOT NULL)`;
         await sql`CREATE TABLE IF NOT EXISTS dcp_purchases (
@@ -27,6 +27,7 @@ export function createPostgresStore(databaseUrl) {
           status text NOT NULL
         )`;
         await sql`ALTER TABLE dcp_purchases ADD COLUMN IF NOT EXISTS refunded_amount integer NOT NULL DEFAULT 0`;
+        await sql`ALTER TABLE dcp_purchases ADD COLUMN IF NOT EXISTS environment text NOT NULL DEFAULT 'sandbox'`;
         await sql`CREATE TABLE IF NOT EXISTS dcp_adjustments (
           adjustment_id text PRIMARY KEY,
           transaction_id text NOT NULL,
@@ -50,6 +51,7 @@ export function createPostgresStore(databaseUrl) {
           used_at timestamptz
         )`;
         await sql`CREATE TABLE IF NOT EXISTS dcp_marker (id text PRIMARY KEY, created_at timestamptz NOT NULL DEFAULT now())`;
+        await sql`CREATE TABLE IF NOT EXISTS dcp_restore_attempts (bucket text PRIMARY KEY, hits integer NOT NULL, window_start timestamptz NOT NULL)`;
       })().catch((error) => {
         schema = null;
         throw error;
@@ -78,21 +80,46 @@ export function createPostgresStore(databaseUrl) {
       await ensureSchema();
       await sql`DELETE FROM dcp_marker WHERE id = ${id}`;
     },
-    async createAccount() {
+    async recordSummary() {
+      await ensureSchema();
+      const [accounts, purchases, events, adjustments, links, emails, restores, channels] = await Promise.all([
+        sql`SELECT count(*)::int AS count FROM dcp_accounts`,
+        sql`SELECT count(*)::int AS count FROM dcp_purchases`,
+        sql`SELECT count(*)::int AS count FROM dcp_events`,
+        sql`SELECT count(*)::int AS count FROM dcp_adjustments`,
+        sql`SELECT count(*)::int AS count FROM dcp_login_links`,
+        sql`SELECT count(*)::int AS count FROM dcp_emails`,
+        sql`SELECT count(*)::int AS count FROM dcp_restore_attempts`,
+        sql`SELECT environment, count(*)::int AS count FROM dcp_purchases GROUP BY environment`
+      ]);
+      const summary = {
+        dcp_accounts: Number(accounts[0]?.count || 0),
+        dcp_purchases: Number(purchases[0]?.count || 0),
+        dcp_events: Number(events[0]?.count || 0),
+        dcp_adjustments: Number(adjustments[0]?.count || 0),
+        dcp_login_links: Number(links[0]?.count || 0),
+        dcp_emails: Number(emails[0]?.count || 0),
+        dcp_restore_attempts: Number(restores[0]?.count || 0)
+      };
+      for (const row of channels) summary[`purchases_${row.environment || "unset"}`] = Number(row.count);
+      return summary;
+    },
+    async createAccount(now = Date.now()) {
       await ensureSchema();
       const bytes = randomBytes(48);
       const accountId = bytes.subarray(0, 16).toString("hex");
       const token = bytes.subarray(16, 48).toString("hex");
-      await sql`INSERT INTO dcp_accounts (token_hash, account_id) VALUES (${sha256(token)}, ${accountId})`;
+      const expiresAt = new Date(now + SESSION_TTL_MS).toISOString();
+      await sql`INSERT INTO dcp_accounts (token_hash, account_id, expires_at) VALUES (${sha256(token)}, ${accountId}, ${expiresAt})`;
       return { accountId, token };
     },
-    async readStatus(token) {
+    async readStatus(token, now = Date.now()) {
       await ensureSchema();
       if (!/^[a-f0-9]{64}$/.test(token || "")) {
         return { status: 401, body: { entitled: false, state: "unauthorized", source: "server" } };
       }
       const rows = await sql`
-        SELECT a.account_id, p.product_id, p.amount, p.currency, p.status, p.refunded_amount
+        SELECT a.account_id, a.expires_at, p.product_id, p.amount, p.currency, p.status, p.refunded_amount, p.environment
         FROM dcp_accounts a
         LEFT JOIN dcp_purchases p ON p.account_id = a.account_id
         WHERE a.token_hash = ${sha256(token)}
@@ -100,26 +127,40 @@ export function createPostgresStore(databaseUrl) {
       `;
       if (!rows.length) return { status: 401, body: { entitled: false, state: "unauthorized", source: "server" } };
       const row = rows[0];
+      const expiresAt = row.expires_at ? new Date(row.expires_at).getTime() : 0;
+      if (!expiresAt || expiresAt <= now) {
+        await sql`DELETE FROM dcp_accounts WHERE token_hash = ${sha256(token)}`;
+        return { status: 401, body: { entitled: false, state: "unauthorized", source: "server" } };
+      }
       if (!row.status) {
         return { status: 200, body: { entitled: false, state: "not-purchased", source: "server", productId: PRODUCT_ID } };
       }
-      const refundedAmount = Number(row.refunded_amount || 0);
-      if (row.status === "refunded") {
-        return { status: 200, body: { entitled: false, state: "refunded", source: "server", productId: row.product_id, refund: "full" } };
-      }
       return {
         status: 200,
-        body: {
-          entitled: true,
-          state: "entitled",
-          source: "server",
+        body: purchaseStatus({
           productId: row.product_id,
           amount: Number(row.amount),
           currency: row.currency,
-          refund: refundedAmount > 0 ? "partial" : "none",
-          refundedAmount
-        }
+          status: row.status,
+          refundedAmount: Number(row.refunded_amount || 0),
+          environment: row.environment
+        })
       };
+    },
+    async revokeSession(token) {
+      await ensureSchema();
+      if (!/^[a-f0-9]{64}$/.test(token || "")) return false;
+      await sql`DELETE FROM dcp_accounts WHERE token_hash = ${sha256(token)}`;
+      return true;
+    },
+    async allowRestore({ email = "", ip = "", now = Date.now() } = {}) {
+      await ensureSchema();
+      const emailKey = emailHash(email);
+      const ipKey = ip ? sha256(`ip:${ip}`) : "";
+      const emailOk = emailKey ? await bumpRestore(sql, `email:${emailKey}`, now, RESTORE_EMAIL_LIMIT) : true;
+      const ipOk = ipKey ? await bumpRestore(sql, `ip:${ipKey}`, now, RESTORE_IP_LIMIT) : true;
+      if (!emailKey && !ipKey) return bumpRestore(sql, "anon", now, RESTORE_IP_LIMIT);
+      return emailOk && ipOk;
     },
     async applyNotification(decision, email) {
       await ensureSchema();
@@ -141,7 +182,7 @@ export function createPostgresStore(databaseUrl) {
         if (accounts.length) local.accounts.set("seed", { accountId: decision.accountId });
       }
       const purchases = await sql`
-        SELECT transaction_id, account_id, product_id, amount, currency, status, refunded_amount
+        SELECT transaction_id, account_id, product_id, amount, currency, status, refunded_amount, environment
         FROM dcp_purchases WHERE transaction_id = ${transactionId}
       `;
       if (purchases[0]) {
@@ -150,6 +191,7 @@ export function createPostgresStore(databaseUrl) {
           productId: purchases[0].product_id,
           amount: Number(purchases[0].amount),
           currency: purchases[0].currency,
+          environment: purchases[0].environment === "live" ? "live" : "sandbox",
           status: purchases[0].status,
           refundedAmount: Number(purchases[0].refunded_amount || 0)
         });
@@ -173,7 +215,7 @@ export function createPostgresStore(databaseUrl) {
       const purchase = local.purchases.get(transactionId);
       if (purchase) {
         await sql`
-          INSERT INTO dcp_purchases (transaction_id, account_id, product_id, amount, currency, status, refunded_amount)
+          INSERT INTO dcp_purchases (transaction_id, account_id, product_id, amount, currency, status, refunded_amount, environment)
           VALUES (
             ${transactionId},
             ${purchase.accountId},
@@ -181,7 +223,8 @@ export function createPostgresStore(databaseUrl) {
             ${purchase.amount},
             ${purchase.currency},
             ${purchase.status},
-            ${purchase.refundedAmount || 0}
+            ${purchase.refundedAmount || 0},
+            ${purchase.environment === "live" ? "live" : "sandbox"}
           )
           ON CONFLICT (transaction_id) DO UPDATE SET
             status = EXCLUDED.status,
@@ -263,7 +306,8 @@ export function createPostgresStore(databaseUrl) {
       `;
       if (!marked.length) return { ok: false, reason: "used" };
       const sessionToken = randomBytes(32).toString("hex");
-      await sql`INSERT INTO dcp_accounts (token_hash, account_id) VALUES (${sha256(sessionToken)}, ${link.account_id})`;
+      const expiresAt = new Date(now + SESSION_TTL_MS).toISOString();
+      await sql`INSERT INTO dcp_accounts (token_hash, account_id, expires_at) VALUES (${sha256(sessionToken)}, ${link.account_id}, ${expiresAt})`;
       return { ok: true, accountId: link.account_id, token: sessionToken };
     }
   };
@@ -271,4 +315,21 @@ export function createPostgresStore(databaseUrl) {
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+async function bumpRestore(sql, bucket, now, limit) {
+  const rows = await sql`SELECT hits, window_start FROM dcp_restore_attempts WHERE bucket = ${bucket}`;
+  const start = rows[0] ? new Date(rows[0].window_start).getTime() : 0;
+  if (!rows[0] || now - start >= RESTORE_WINDOW_MS) {
+    const windowStart = new Date(now).toISOString();
+    await sql`
+      INSERT INTO dcp_restore_attempts (bucket, hits, window_start)
+      VALUES (${bucket}, 1, ${windowStart})
+      ON CONFLICT (bucket) DO UPDATE SET hits = 1, window_start = EXCLUDED.window_start
+    `;
+    return true;
+  }
+  const hits = Number(rows[0].hits) + 1;
+  await sql`UPDATE dcp_restore_attempts SET hits = ${hits} WHERE bucket = ${bucket}`;
+  return hits <= limit;
 }

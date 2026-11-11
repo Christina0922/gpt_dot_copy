@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createLicenseHandler } from "./http.js";
 import { LOGIN_LINK_TTL_MS } from "./login.js";
+import { mailConfig } from "./mail.js";
 import { createMemoryRuntime, runtimeFromEnv } from "./runtime.js";
 import { signBody } from "./signature.js";
 
@@ -97,7 +98,8 @@ test("signed sandbox notification grants once, and failure, tamper, or outage do
   assert.equal(tampered.status, 401);
   assert.equal((await postWebhook(handle, payload(buyer.accountId, { eventId: "evt_low", amount: 1 }))).body.granted, false);
   const status = await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${buyer.token}` } });
-  assert.equal(status.body.state, "entitled");
+  assert.equal(status.body.state, "sandbox");
+  assert.equal(status.body.entitled, false);
   assert.equal(JSON.stringify(status.body).includes("buyer@example.com"), false);
   runtime.store.failReads = true;
   const down = await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${buyer.token}` } });
@@ -141,7 +143,8 @@ test("refund revokes the recorded purchase and a restore link is single-use", as
   assert.equal(consumed.status, 303);
   const cookie = /dcp_session=([a-f0-9]{64})/.exec(consumed.headers["set-cookie"]);
   const restored = await handle({ method: "GET", path: "/api/status", headers: { cookie: `dcp_session=${cookie[1]}` } });
-  assert.equal(restored.body.state, "entitled");
+  assert.equal(restored.body.state, "sandbox");
+  assert.equal(restored.body.entitled, false);
   const otherStatus = await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${other.token}` } });
   assert.equal(otherStatus.body.state, "not-purchased");
   const reused = await handle({ method: "GET", path: `/api/restore/consume?token=${token}` });
@@ -207,19 +210,21 @@ test("approved refunds keep the final entitlement through partial, duplicate, an
     event_type: "transaction.refunded",
     data: { id: "txn_1", status: "refunded" }
   })).body.granted, false);
-  assert.equal((await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${buyer.token}` } })).body.state, "entitled");
+  assert.equal((await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${buyer.token}` } })).body.state, "sandbox");
 
   await postWebhook(handle, adjustment("evt_pending", { status: "pending_approval", type: "full", amount: 4900, occurredAt: "2026-11-11T00:01:00.000Z" }));
   await postWebhook(handle, adjustment("evt_rejected", { status: "rejected", type: "full", amount: 4900, occurredAt: "2026-11-11T00:02:00.000Z" }));
   await postWebhook(handle, adjustment("evt_credit", { action: "credit", type: "full", amount: 4900, occurredAt: "2026-11-11T00:02:30.000Z" }));
   let status = await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${buyer.token}` } });
-  assert.equal(status.body.state, "entitled");
+  assert.equal(status.body.state, "sandbox");
+  assert.equal(status.body.entitled, false);
 
   await postWebhook(handle, adjustment("evt_partial", { id: "adj_partial", amount: 1000, occurredAt: "2026-11-11T00:03:00.000Z" }));
   await postWebhook(handle, adjustment("evt_partial", { id: "adj_partial", amount: 1000, occurredAt: "2026-11-11T00:03:00.000Z" }));
   await postWebhook(handle, adjustment("evt_partial_old", { id: "adj_partial", status: "pending_approval", amount: 1000, occurredAt: "2026-11-11T00:02:30.000Z" }));
   status = await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${buyer.token}` } });
-  assert.equal(status.body.state, "entitled");
+  assert.equal(status.body.state, "sandbox");
+  assert.equal(status.body.entitled, false);
   assert.equal(status.body.refund, "partial");
   assert.equal(status.body.refundedAmount, 1000);
 
@@ -231,7 +236,8 @@ test("approved refunds keep the final entitlement through partial, duplicate, an
     items: [{ type: "full", amount: "4900", price: { product_id: "pro_other" } }]
   }));
   status = await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${buyer.token}` } });
-  assert.equal(status.body.state, "entitled");
+  assert.equal(status.body.state, "sandbox");
+  assert.equal(status.body.entitled, false);
 
   await postWebhook(handle, adjustment("evt_rest", { id: "adj_rest", amount: 3900, occurredAt: "2026-11-11T00:05:00.000Z" }));
   status = await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${buyer.token}` } });
@@ -264,6 +270,12 @@ test("the mail transport is SMTP and an API-key variable is not the password", a
     env: { ...env, DCP_EMAIL_FROM: "buyer@example.com", DCP_EMAIL_SMTP_PASSWORD: "smtp-password" }
   });
   assert.equal((await configured({ method: "GET", path: "/api/health" })).body.mail, "configured");
+  const config = mailConfig({ DCP_EMAIL_FROM: "buyer@example.com", DCP_EMAIL_SMTP_PASSWORD: "smtp-password", DCP_EMAIL_API_KEY: "not-used" });
+  assert.equal(config.host, "smtp.gmail.com");
+  assert.equal(config.port, 465);
+  assert.equal(config.secure, true);
+  assert.equal(config.passwordPresent, true);
+  assert.deepEqual(Object.keys(config).sort(), ["fromPresent", "host", "passwordPresent", "port", "secure"]);
 });
 
 test("a failed mail send is not reported as sent and a mismatched link does not change accounts", async () => {
@@ -288,5 +300,83 @@ test("a failed mail send is not reported as sent and a mismatched link does not 
   assert.equal(mismatch.body.includes("다른 계정"), true);
   assert.equal(mismatch.headers?.["set-cookie"], undefined);
   const status = await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${buyer.token}` } });
-  assert.equal(status.body.state, "entitled");
+  assert.equal(status.body.state, "sandbox");
+  assert.equal(status.body.entitled, false);
+});
+
+test("a session without a purchase is not Pro, logout drops only that session, and an old session expires", async () => {
+  const { runtime, handle } = handler();
+  const buyer = (await handle({ method: "POST", path: "/api/session" })).body;
+  const unpaid = await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${buyer.token}` } });
+  assert.equal(unpaid.body.state, "not-purchased");
+  assert.equal(unpaid.body.entitled, false);
+  assert.equal(JSON.stringify(unpaid.body).includes(buyer.token), false);
+  const loggedOut = await handle({ method: "POST", path: "/api/logout", headers: { authorization: `Bearer ${buyer.token}` } });
+  assert.equal(loggedOut.body.ok, true);
+  assert.equal(loggedOut.headers["set-cookie"].includes("Max-Age=0"), true);
+  assert.equal(JSON.stringify(loggedOut.body).includes(buyer.token), false);
+  const after = await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${buyer.token}` } });
+  assert.equal(after.status, 401);
+  assert.equal(after.body.state, "unauthorized");
+  const next = (await handle({ method: "POST", path: "/api/session" })).body;
+  runtime.store.accounts.get([...runtime.store.accounts.keys()].at(-1)).expiresAt = now - 1;
+  const expired = await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${next.token}` } });
+  assert.equal(expired.status, 401);
+  const bad = await handle({ method: "GET", path: "/api/restore/consume?token=not-a-token" });
+  assert.equal(bad.status, 400);
+  assert.equal(bad.body.includes("확인할 수 없습니다"), true);
+});
+
+test("restore requests are limited and a live purchase stays separate from Sandbox", async () => {
+  const sent = [];
+  const { handle } = handler(createMemoryRuntime(), {
+    mailer() {
+      sent.push(true);
+      return { sent: true };
+    }
+  });
+  const buyer = (await handle({ method: "POST", path: "/api/session" })).body;
+  await postWebhook(handle, payload(buyer.accountId));
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const response = await handle({
+      method: "POST",
+      path: "/api/restore",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "buyer@example.com" })
+    });
+    assert.equal(response.status, 200);
+  }
+  const limited = await handle({
+    method: "POST",
+    path: "/api/restore",
+    headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.8" },
+    body: JSON.stringify({ email: "buyer@example.com" })
+  });
+  assert.equal(limited.status, 429);
+  assert.equal(limited.body.reason, "limited");
+  assert.equal(sent.length, 5);
+  const live = createLicenseHandler({
+    runtime: createMemoryRuntime(),
+    env: { ...env, DCP_PADDLE_ENV: "live" },
+    now: () => now,
+    mailer() {
+      return { sent: true };
+    }
+  });
+  const liveBuyer = (await live({ method: "POST", path: "/api/session" })).body;
+  const raw = JSON.stringify(payload(liveBuyer.accountId, { eventId: "evt_live", transactionId: "txn_live" }));
+  const granted = await live({
+    method: "POST",
+    path: "/api/webhook",
+    headers: { "paddle-signature": signBody(raw, secret, now) },
+    body: raw
+  });
+  assert.equal(granted.body.granted, true);
+  const liveStatus = await live({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${liveBuyer.token}` } });
+  assert.equal(liveStatus.body.state, "entitled");
+  assert.equal(liveStatus.body.channel, "live");
+  const sandboxStatus = await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${buyer.token}` } });
+  assert.equal(sandboxStatus.body.state, "sandbox");
+  assert.equal(sandboxStatus.body.channel, "sandbox");
+  assert.equal(sandboxStatus.body.entitled, false);
 });

@@ -1,5 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 
+export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
 export function createMemoryStore() {
   return {
     accounts: new Map(),
@@ -13,10 +15,10 @@ export function createMemoryStore() {
   };
 }
 
-export function createAccount(store, bytes = randomBytes(48)) {
+export function createAccount(store, bytes = randomBytes(48), now = Date.now()) {
   const accountId = bytes.subarray(0, 16).toString("hex");
   const token = bytes.subarray(16, 48).toString("hex");
-  store.accounts.set(hashToken(token), { accountId });
+  store.accounts.set(hashToken(token), { accountId, expiresAt: now + SESSION_TTL_MS });
   return { accountId, token };
 }
 
@@ -25,12 +27,17 @@ export function accountFromToken(store, token) {
   return store.accounts.get(hashToken(token)) || null;
 }
 
-export function addToken(store, accountId, bytes = randomBytes(32)) {
+export function addToken(store, accountId, bytes = randomBytes(32), expiresAt = Date.now() + SESSION_TTL_MS) {
   if (!accountExists(store, accountId)) return null;
   const token = bytes.toString("hex");
   if (!/^[a-f0-9]{64}$/.test(token)) return null;
-  store.accounts.set(hashToken(token), { accountId });
+  store.accounts.set(hashToken(token), { accountId, expiresAt });
   return { accountId, token };
+}
+
+export function revokeToken(store, token) {
+  if (typeof token !== "string" || !/^[a-f0-9]{64}$/.test(token)) return false;
+  return store.accounts.delete(hashToken(token));
 }
 
 export function accountExists(store, accountId) {

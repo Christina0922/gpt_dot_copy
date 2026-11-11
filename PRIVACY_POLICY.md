@@ -2,7 +2,7 @@
 
 Last updated: November 12, 2026
 
-Dot Copy Paste is an independent Chrome extension. It is not an official OpenAI product and is not affiliated with, endorsed by, or sponsored by OpenAI. Copy and paste guidance are free. Exporting the open dot conversation is a separate one-time feature. Version 0.2.6 does not sell it and does not send the conversation to a server.
+Dot Copy Paste is an independent Chrome extension. It is not an official OpenAI product and is not affiliated with, endorsed by, or sponsored by OpenAI. Copy and paste guidance are free. Exporting the open dot conversation is a separate one-time feature. Version 0.2.7 does not sell it and does not send the conversation to a server.
 
 The current policy is this file. `archive/Dot_Copy_Paste_Privacy_Policy_2026-10-19.docx` is an old snapshot from October 19, 2026. It is not the policy for the current extension.
 
@@ -20,7 +20,7 @@ Conversation text and clipboard contents are processed locally in the browser. T
 
 The enabled/disabled setting and the language choice are stored in `chrome.storage.local`. A local `pro` value does not unlock export.
 
-The purchase-status check can contact `https://dot-copy-paste.vercel.app` and send only a session token, or the cookie set when a one-time restore link is opened. It does not send conversation text, clipboard text, or attachments. The license server stores a hash of the session token, an account id, a hash of the payment email, the transaction id, the payment-notification id, the product id, the amount, the currency, and the entitlement status. Typing an email address does not grant a purchase. A payment-success page does not grant a purchase. Removing the extension clears the local token. A deletion request for a server record can be sent to `connect.geniusbrain@gmail.com` or through https://github.com/Christina0922/gpt_dot_copy. Records a payment provider must keep for tax or refund handling follow that provider's policy.
+The purchase-status check can contact `https://dot-copy-paste.vercel.app` and send only a session token, or the cookie set when a one-time restore link is opened. It does not send conversation text, clipboard text, or attachments. The license server stores a hash of the session token, an account id, the session expiry, a hash of the payment email, the transaction id, the payment-notification id, the product id, the amount, the currency, whether the purchase is Sandbox or live, and the entitlement status. A session lasts 30 days. Logout deletes that browser's token hash and leaves the purchase record. A Sandbox purchase does not count as a live purchase. Typing an email address does not grant a purchase. A payment-success page does not grant a purchase. Restore requests are limited, and the limit stores only a short-lived hash bucket, not the email text. Removing the extension clears the local token. A deletion request for a server record can be sent to `connect.geniusbrain@gmail.com` or through https://github.com/Christina0922/gpt_dot_copy. Records a payment provider must keep for tax or refund handling follow that provider's policy.
 
 ## Permissions
 

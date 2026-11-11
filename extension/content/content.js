@@ -65,6 +65,7 @@ const MESSAGES = {
     exportShort: "Only the messages loaded now are saved.",
     proShort: "Pro one-time KRW 4,900 · no automatic renewal",
     purchaseSignIn: "Sign in or restore a purchase to check it.",
+    purchaseSandbox: "A Sandbox purchase is not a live purchase.",
     guidePrice: "Price",
     guidePrivacy: "Privacy",
     guideTerms: "Terms",
@@ -126,6 +127,7 @@ const MESSAGES = {
     exportShort: "현재 불러온 메시지만 저장합니다.",
     proShort: "Pro 일회성 4,900원 · 자동 갱신 없음",
     purchaseSignIn: "구매 확인을 위해 로그인하거나 구매를 복원해 주세요.",
+    purchaseSandbox: "Sandbox 구매는 실구매로 사용되지 않습니다.",
     guidePrice: "가격",
     guidePrivacy: "개인정보",
     guideTerms: "약관",
@@ -1212,6 +1214,9 @@ function entitlementFromServer(body) {
   if (body.state === "unauthorized") {
     return { entitled: false, state: "unauthorized", source: "server" };
   }
+  if (body.state === "sandbox") {
+    return { entitled: false, state: "sandbox", source: "server" };
+  }
   const matches = body.entitled === true
     && body.state === "entitled"
     && body.productId === PRODUCT_ID
@@ -1246,6 +1251,8 @@ function statusMessageKey(entitlement, { saleOpen = false } = {}) {
       return "purchaseNone";
     case "unauthorized":
       return "purchaseSignIn";
+    case "sandbox":
+      return "purchaseSandbox";
     case "refunded":
       return "purchaseRefunded";
     case "sale-closed":
@@ -2295,7 +2302,7 @@ startApp({
   chrome,
   window,
   document,
-  build: "a8ba71e0f327"
+  build: "0385eb801f52"
 }).catch((error) => {
   const name = error && typeof error.name === "string" ? error.name : "Error";
   console.error("[Dot Copy Paste]", name);

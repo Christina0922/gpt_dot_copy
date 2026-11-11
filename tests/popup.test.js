@@ -55,7 +55,7 @@ test("popup has no clipboard permission menu and does not start a payment", asyn
   let asked = 0;
   const popup = wirePopup(doc, {
     chrome,
-    version: "0.2.6",
+    version: "0.2.7",
     askPage() {
       asked += 1;
       return { ok: true, code: "exported-full" };
@@ -76,7 +76,7 @@ test("popup has no clipboard permission menu and does not start a payment", asyn
   assert.equal(doc.querySelector("[data-i18n='freeStatus']").textContent, "Free");
   assert.equal(doc.querySelector("details").open, false);
   assert.equal(doc.querySelector("[data-i18n='domUnverified']").textContent, "Copy and paste buttons appear only on a ChatGPT dot conversation page.");
-  assert.equal(doc.querySelector("[data-role='version']").textContent, "0.2.6");
+  assert.equal(doc.querySelector("[data-role='version']").textContent, "0.2.7");
   assert.equal(doc.querySelector("[data-action='buy-pro']").disabled, true);
   assert.equal(doc.querySelector("[data-action='buy-pro']").textContent, "Sale in preparation");
   assert.equal(doc.querySelector("[data-role='purchase-status']").textContent, "No purchase was confirmed for this account.");
@@ -95,7 +95,7 @@ test("a missing login session asks for sign-in and does not export", async () =>
   let asked = 0;
   const popup = wirePopup(doc, {
     chrome,
-    version: "0.2.6",
+    version: "0.2.7",
     askPage() {
       asked += 1;
       return { ok: true, code: "exported-full" };

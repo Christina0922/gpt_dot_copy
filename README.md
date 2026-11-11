@@ -1,7 +1,7 @@
 # Dot Copy Paste
 
 작업명: Dot Copy Paste  
-버전: 0.2.6  
+버전: 0.2.7  
 공개 제품명과 상표 검토: 완료되지 않음
 
 이 확장프로그램은 OpenAI의 공식 제품이나 제휴 제품이 아닙니다.
@@ -14,7 +14,7 @@
 
 - 프로젝트: `D:\1000_b_project\gpt_dot_copy`
 - 압축해제 설치 폴더: `D:\1000_b_project\gpt_dot_copy\extension`
-- 웹스토어 업데이트 ZIP: `D:\1000_b_project\gpt_dot_copy\dist\Dot-Copy-Paste-0.2.6.zip`
+- 웹스토어 업데이트 ZIP: `D:\1000_b_project\gpt_dot_copy\dist\Dot-Copy-Paste-0.2.7.zip`
 - 라이선스 서버: `https://dot-copy-paste.vercel.app` (판매는 준비 중이며, 이 주소는 실결제를 시작하지 않습니다)
 
 처음 파일은 `D:\1000_b_project\Dot_Copy_Paste`에 작성한 뒤 이 폴더로 통합했습니다. 그 원본 폴더는 삭제하지 않았습니다.
@@ -36,7 +36,7 @@ scripts\package.cmd
 2. 개발자 모드를 켭니다.
 3. 압축해제된 확장 프로그램을 로드합니다.
 4. `D:\1000_b_project\gpt_dot_copy\extension` 폴더를 선택합니다.
-5. 도구 모음에서 Dot Copy Paste 팝업을 열어 버전 0.2.6을 확인합니다. 구매 버튼은 ‘판매 준비 중’이며 결제 페이지로 이동하지 않습니다. 로그인 세션이 없으면 구매 상태 확인은 구매 없음을 단정하지 않습니다.
+5. 도구 모음에서 Dot Copy Paste 팝업을 열어 버전 0.2.7을 확인합니다. 구매 버튼은 ‘판매 준비 중’이며 결제 페이지로 이동하지 않습니다. 로그인 세션이 없으면 구매 상태 확인은 구매 없음을 단정하지 않습니다. Sandbox 구매는 실구매로 표시하지 않습니다.
 
 이미 `D:\1000_b_project\Dot_Copy_Paste\extension`을 Chrome에 불러왔다면 그 항목을 제거하고 위 새 폴더를 다시 불러와야 합니다. 확장프로그램 ID와 클립보드 선택 권한이 그대로 유지된다고 보지 않습니다.
 

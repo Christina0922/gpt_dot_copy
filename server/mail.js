@@ -1,7 +1,18 @@
 import { normalizeEmail } from "./login.js";
 
 export function mailReady(env = {}) {
-  return Boolean(cleanFrom(env.DCP_EMAIL_FROM) && smtpPassword(env));
+  return Boolean(mailConfig(env).fromPresent && mailConfig(env).passwordPresent);
+}
+
+export function mailConfig(env = {}) {
+  const port = Number(env.DCP_EMAIL_SMTP_PORT || 465);
+  return {
+    host: typeof env.DCP_EMAIL_SMTP_HOST === "string" && env.DCP_EMAIL_SMTP_HOST ? env.DCP_EMAIL_SMTP_HOST : "smtp.gmail.com",
+    port: Number.isInteger(port) && port > 0 ? port : 465,
+    secure: (Number.isInteger(port) && port > 0 ? port : 465) === 465,
+    fromPresent: Boolean(cleanFrom(env.DCP_EMAIL_FROM)),
+    passwordPresent: Boolean(smtpPassword(env))
+  };
 }
 
 export async function sendLoginMail({ to, link, env = {}, transport } = {}) {
@@ -13,18 +24,18 @@ export async function sendLoginMail({ to, link, env = {}, transport } = {}) {
     const result = await transport({ to: recipient, link });
     return result?.sent === true ? { sent: true } : { sent: false, reason: result?.reason || "not-sent" };
   }
-  const from = cleanFrom(env.DCP_EMAIL_FROM);
-  const pass = smtpPassword(env);
-  if (!from || !pass) return { sent: false, reason: "mail-not-configured" };
-  try {
-    const nodemailer = await import("nodemailer");
-    const port = Number(env.DCP_EMAIL_SMTP_PORT || 465);
-    const transporter = nodemailer.createTransport({
-      host: env.DCP_EMAIL_SMTP_HOST || "smtp.gmail.com",
-      port,
-      secure: port === 465,
-      auth: { user: from, pass }
-    });
+    const from = cleanFrom(env.DCP_EMAIL_FROM);
+    const pass = smtpPassword(env);
+    const config = mailConfig(env);
+    if (!from || !pass) return { sent: false, reason: "mail-not-configured" };
+    try {
+      const nodemailer = await import("nodemailer");
+      const transporter = nodemailer.createTransport({
+        host: config.host,
+        port: config.port,
+        secure: config.secure,
+        auth: { user: from, pass }
+      });
     await transporter.sendMail({
       from,
       to: recipient,
