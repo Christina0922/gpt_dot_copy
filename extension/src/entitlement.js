@@ -35,14 +35,26 @@ export function entitlementFromServer(body) {
   return { entitled: false, state: "not-purchased", source: "server" };
 }
 
+export async function readPurchaseStatus({ storage, sale = SALE, request } = {}) {
+  if (!sale?.statusBase) return readEntitlement({ storage, sale, request });
+  if (typeof request !== "function") return { entitled: false, state: "unavailable", source: "local-config" };
+  const stored = await readStorage(storage);
+  const token = typeof stored?.licenseSession?.token === "string" ? stored.licenseSession.token : "";
+  try {
+    return entitlementFromServer(await request({ token }));
+  } catch {
+    return { entitled: false, state: "unavailable", source: "server" };
+  }
+}
+
 export function mayExport(entitlement) {
   return entitlement?.entitled === true && entitlement.state === "entitled" && entitlement.source === "server";
 }
 
-export function statusMessageKey(entitlement) {
+export function statusMessageKey(entitlement, { saleOpen = false } = {}) {
   switch (entitlement?.state) {
     case "entitled":
-      return "purchaseActive";
+      return saleOpen ? "purchaseActive" : "purchaseRecorded";
     case "not-purchased":
       return "purchaseNone";
     case "refunded":

@@ -7,6 +7,7 @@ export const SALE = Object.freeze({
   fullExportVerified: false,
   provider: "paddle",
   apiBase: "",
+  statusBase: "https://dot-copy-paste.vercel.app",
   productId: PRODUCT_ID,
   amount: 4900,
   currency: "KRW",

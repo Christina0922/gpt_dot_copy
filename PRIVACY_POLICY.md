@@ -2,7 +2,7 @@
 
 Last updated: November 11, 2026
 
-Dot Copy Paste is an independent Chrome extension. It is not an official OpenAI product and is not affiliated with, endorsed by, or sponsored by OpenAI. Copy and paste guidance are free. Exporting the open dot conversation is a separate one-time feature. Version 0.2.4 does not sell it and does not send the conversation to a server.
+Dot Copy Paste is an independent Chrome extension. It is not an official OpenAI product and is not affiliated with, endorsed by, or sponsored by OpenAI. Copy and paste guidance are free. Exporting the open dot conversation is a separate one-time feature. Version 0.2.5 does not sell it and does not send the conversation to a server.
 
 The current policy is this file. `archive/Dot_Copy_Paste_Privacy_Policy_2026-10-19.docx` is an old snapshot from October 19, 2026. It is not the policy for the current extension.
 
@@ -18,21 +18,21 @@ Conversation messages and clipboard text may contain personal communications. Th
 
 Conversation text and clipboard contents are processed locally in the browser. The extension does not send them to Genius Brain or any other server, and it does not keep a conversation archive or clipboard history.
 
-The enabled/disabled setting and the language choice are stored in `chrome.storage.local`. A local `pro` value does not unlock export. This version does not store a purchase token because it does not contact a license server.
+The enabled/disabled setting and the language choice are stored in `chrome.storage.local`. A local `pro` value does not unlock export.
 
-If a license server is connected later, the extension would send only the account session token needed to ask whether export is active. The server design stores a hash of that token, an account id, the transaction id, product id, amount, currency, and entitlement status. It does not use an email address as the way to claim another person's purchase. Payment provider records may also hold an email if the provider collects one. Conversation text is not part of that record. Removing the extension clears the local token. Server purchase records are not created by this version. A deletion request for a future record can be sent to `connect.geniusbrain@gmail.com` or through https://github.com/Christina0922/gpt_dot_copy. Records a payment provider must keep for tax or refund handling follow that provider's policy.
+The purchase-status check can contact `https://dot-copy-paste.vercel.app` and send only a session token, or the cookie set when a one-time restore link is opened. It does not send conversation text, clipboard text, or attachments. The license server stores a hash of the session token, an account id, a hash of the payment email, the transaction id, the payment-notification id, the product id, the amount, the currency, and the entitlement status. Typing an email address does not grant a purchase. A payment-success page does not grant a purchase. Removing the extension clears the local token. A deletion request for a server record can be sent to `connect.geniusbrain@gmail.com` or through https://github.com/Christina0922/gpt_dot_copy. Records a payment provider must keep for tax or refund handling follow that provider's policy.
 
 ## Permissions
 
 Site access to `https://chatgpt.com/*` lets the extension find a dot conversation, the message body, and the composer, and show its controls. It does not run on other sites.
 
-`storage` keeps the local settings above. No permission was added for export or payments. The extension does not declare host access to a license server because no server is configured.
+`storage` keeps the local settings above. Host access is limited to `https://dot-copy-paste.vercel.app/*` so the popup can ask that license server whether a purchase is recorded. No other host was added.
 
 The extension does not declare `clipboardRead`. It does not watch the clipboard, and the paste button does not read it. Copy runs from the button click and does not need that permission.
 
 ## Purchases
 
-The planned price is a one-time KRW 4,900 payment. There is no subscription and no automatic renewal. The seller would be the extension developer, not Google. Later features are not promised as part of that purchase. The sale is closed in this version. Use and refund terms are in `TERMS.md`.
+The planned price is a one-time KRW 4,900 payment. There is no subscription and no automatic renewal. The seller would be the extension developer, not Google. Later features are not promised as part of that purchase. Full-thread export is not offered for sale. The sale is closed in this version. Use and refund terms are in `TERMS.md`.
 
 ## Your choices
 

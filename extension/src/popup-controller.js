@@ -1,6 +1,6 @@
-import { readEntitlement, statusMessageKey } from "./entitlement.js";
+import { readEntitlement, readPurchaseStatus, statusMessageKey } from "./entitlement.js";
 import { createTranslator, resolveLanguage } from "./i18n.js";
-import { purchasePresentation } from "./sale.js";
+import { purchasePresentation, SALE } from "./sale.js";
 import { loadSettings, normalizeSettings, saveSettings } from "./settings.js";
 
 const EXPORT_CODES = {
@@ -51,6 +51,8 @@ export function wirePopup(doc, { chrome, version, askPage, licenseRequest } = {}
     const purchase = purchasePresentation();
     nodes.buy.dataset.i18n = purchase.labelKey;
     nodes.buy.disabled = purchase.disabled;
+    const restore = doc.querySelector("[data-action='restore-purchase']");
+    restore.href = SALE.statusBase ? `${SALE.statusBase}/restore` : "";
     for (const node of doc.querySelectorAll("[data-i18n]")) {
       node.textContent = t(node.dataset.i18n);
     }
@@ -68,8 +70,8 @@ export function wirePopup(doc, { chrome, version, askPage, licenseRequest } = {}
   }
 
   async function showEntitlement() {
-    const entitlement = await readEntitlement({ storage, request: licenseRequest });
-    showPurchase(statusMessageKey(entitlement));
+    const entitlement = await readPurchaseStatus({ storage, request: licenseRequest });
+    showPurchase(statusMessageKey(entitlement, { saleOpen: SALE.open === true }));
     return entitlement;
   }
 
@@ -88,7 +90,10 @@ export function wirePopup(doc, { chrome, version, askPage, licenseRequest } = {}
     showPurchase("salePreparing");
   });
 
-  doc.querySelector("[data-action='restore-purchase']").addEventListener("click", () => {
+  doc.querySelector("[data-action='restore-purchase']").addEventListener("click", (event) => {
+    const href = event.currentTarget.getAttribute("href") || "";
+    if (href.startsWith("https://")) return;
+    event.preventDefault();
     showEntitlement();
   });
 

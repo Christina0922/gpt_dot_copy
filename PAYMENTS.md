@@ -1,6 +1,6 @@
 # Payments
 
-Dot Copy Paste does not contact a payment provider in version 0.2.4. The purchase button says the sale is in preparation and does not open a payment page.
+Dot Copy Paste does not open a live payment in version 0.2.5. The purchase button says the sale is in preparation and does not open a payment page. The license server is `https://dot-copy-paste.vercel.app`. It is a separate Vercel project named `dot-copy-paste`. It does not use the AI Status Monitor project or `geniusbrain.works`.
 
 Another extension in the same workspace, AI Status Monitor, uses Paddle for a different one-time product priced in USD. That product, price, webhook, and license host are not reused here. This repository has no Paddle product for a one-time KRW 4,900 export.
 
@@ -15,15 +15,15 @@ Official Paddle documentation checked on November 11, 2026:
 
 ## License server
 
-Use a new Vercel project, not the AI Status Monitor project. `https://ai-status-monitor.vercel.app` responded 200 on November 11, 2026 and belongs to that product. `https://dot-copy-paste.vercel.app` responded 404 and was not serving another product checked here. That hostname is the proposed address for this license server. Do not use `geniusbrain.works`.
+`https://dot-copy-paste.vercel.app` is assigned to the new `dot-copy-paste` project. A purchase account created there was still present after a redeploy. The database is a separate Neon Postgres resource named `dcp-license`, connected only to this project. The in-memory store in `server/` is only for automated tests.
 
-Purchase records for a connected server must go to a persistent database on that project. The in-memory store in `server/` is only for automated tests.
+No Paddle Sandbox product or price exists for this extension yet. The server has no Paddle API key, so it did not create one and did not change the AI Status Monitor product. Until a sandbox checkout is opened, the tax-inclusive total charged to a buyer in Korea remains unverified. The catalog amount stays 4900 KRW.
 
 ## Restore
 
 This product has no account system. Restore is a one-time link sent to the payment email. The server stores a hash of a random single-use token and a short expiry. Opening that link is the proof of mailbox ownership. Typing the email alone does not grant the purchase.
 
-No email sender is connected to this product. `geniusbrain.works` has a Gmail SMTP notifier for site inquiries, and it is not a purchase-login sender for this extension. A connected sale needs a separate transactional email account, a from-address, and these server-only variables:
+The restore link is implemented. It expires in 15 minutes and can be used once. Opening it does not create a payment. No message was sent: the existing Gmail app password is stored as a sensitive variable on the other site and was not readable for reuse. These server-only variables remain:
 
 - `DCP_EMAIL_API_KEY`
 - `DCP_EMAIL_FROM`

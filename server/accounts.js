@@ -6,6 +6,8 @@ export function createMemoryStore() {
     purchases: new Map(),
     events: new Set(),
     byAccount: new Map(),
+    emails: new Map(),
+    loginLinks: new Map(),
     failReads: false
   };
 }
@@ -20,6 +22,14 @@ export function createAccount(store, bytes = randomBytes(48)) {
 export function accountFromToken(store, token) {
   if (typeof token !== "string" || !/^[a-f0-9]{64}$/.test(token)) return null;
   return store.accounts.get(hashToken(token)) || null;
+}
+
+export function addToken(store, accountId, bytes = randomBytes(32)) {
+  if (!accountExists(store, accountId)) return null;
+  const token = bytes.toString("hex");
+  if (!/^[a-f0-9]{64}$/.test(token)) return null;
+  store.accounts.set(hashToken(token), { accountId });
+  return { accountId, token };
 }
 
 export function accountExists(store, accountId) {

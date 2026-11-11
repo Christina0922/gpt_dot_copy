@@ -1,4 +1,5 @@
 node_modules/
+.vercel/
 dist/
 chrome-smoke-profile/
 .env
@@ -8,3 +9,5 @@ chrome-smoke-profile/
 # Raw saved Dot pages contain real conversations; only sanitized fixtures belong in the repo.
 /dot-page.html
 /dot-page*.htm
+.vercel
+.env*.local

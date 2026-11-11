@@ -52,6 +52,7 @@ h2 {
 }
 
 button,
+.actions a,
 select {
   font: inherit;
   border: 1px solid #cbd5e1;
@@ -63,6 +64,10 @@ select {
 
 .actions {
   flex-wrap: wrap;
+}
+
+.actions a {
+  text-decoration: none;
 }
 
 button:disabled {

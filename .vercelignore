@@ -1,0 +1,12 @@
+node_modules
+extension
+tests
+dist
+archive
+scripts
+chrome-smoke-profile
+.git
+*.md
+.env
+.env.*
+.vercel

@@ -1,0 +1,8 @@
+{
+  "version": 2,
+  "installCommand": "npm install --omit=dev",
+  "rewrites": [
+    { "source": "/", "destination": "/api/router?path=/" },
+    { "source": "/((?!api/).*)", "destination": "/api/router?path=/$1" }
+  ]
+}

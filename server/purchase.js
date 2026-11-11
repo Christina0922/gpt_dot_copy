@@ -23,7 +23,12 @@ export function interpretNotification(notification, expected) {
     const moneyOk = amount === expected?.amount && currency === expected?.currency;
     const accountOk = /^[a-f0-9]{32}$/.test(accountId);
     const quantityOk = quantity === 1;
-    if (priceOk && productOk && moneyOk && accountOk && quantityOk) decision.action = "grant";
+    if (priceOk && productOk && moneyOk && accountOk && quantityOk) {
+      decision.action = "grant";
+      if (typeof expected.catalogProductId === "string" && expected.catalogProductId) {
+        decision.catalogProductId = expected.catalogProductId;
+      }
+    }
     return decision;
   }
 
@@ -43,7 +48,7 @@ export function applyDecision(store, decision) {
     }
     store.purchases.set(decision.transactionId, {
       accountId: decision.accountId,
-      productId: decision.productId,
+      productId: decision.catalogProductId || decision.productId,
       amount: decision.amount,
       currency: decision.currency,
       status: "active"

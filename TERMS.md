@@ -6,7 +6,7 @@ Dot Copy Paste is free to install. Copy and the paste guidance stay free. Export
 
 The seller is the extension developer, not Google. The Chrome Web Store developer email is `connect.geniusbrain@gmail.com`.
 
-Version 0.2.4 does not sell this feature. The purchase button says the sale is in preparation and does not open a payment page. No refund can be requested for a purchase this version does not accept.
+Version 0.2.5 does not sell this feature. The purchase button says the sale is in preparation and does not open a payment page. Full-thread export is not part of the offer. No refund can be requested for a purchase this version does not accept. A payment-success page does not activate the purchase.
 
 The export file is created in the browser. The full conversation is not confirmed on the live dot page, so a saved file would be labeled as the messages loaded on screen. Original attachments are not downloaded. That file is not uploaded to a license server.
 

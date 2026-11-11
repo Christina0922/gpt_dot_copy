@@ -3,7 +3,8 @@ import test from "node:test";
 import { createAccount, createMemoryStore } from "../server/accounts.js";
 import { createLicenseApp, EXPECTED_PRODUCT, paddleConfigFromEnv, paddleReady } from "../server/license-app.js";
 import { signBody } from "../server/signature.js";
-import { entitlementFromServer, mayExport, readEntitlement } from "../extension/src/entitlement.js";
+import { entitlementFromServer, mayExport, readEntitlement, readPurchaseStatus } from "../extension/src/entitlement.js";
+import { SALE } from "../extension/src/sale.js";
 
 const secret = "test-only-webhook-secret";
 const now = 1_700_000_000_000;
@@ -135,4 +136,13 @@ test("a local pro flag and a closed sale never count as a purchase", async () =>
   const config = paddleConfigFromEnv({});
   assert.equal(paddleReady(config), false);
   assert.equal(config.providerApiOrigin, "https://api.paddle.com");
+  const recorded = await readPurchaseStatus({
+    storage: { async get() { return {}; } },
+    sale: { ...SALE, open: false, fullExportVerified: false, statusBase: "https://license.example" },
+    async request() {
+      return { entitled: true, state: "entitled", source: "server", productId: "dot-copy-paste-export", amount: 4900, currency: "KRW" };
+    }
+  });
+  assert.equal(recorded.state, "entitled");
+  assert.equal(mayExport(entitlement), false);
 });

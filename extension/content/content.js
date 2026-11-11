@@ -77,6 +77,7 @@ const MESSAGES = {
     buyPro: "Buy Pro — one-time KRW 4,900",
     restorePurchase: "Restore purchase",
     checkPurchase: "Check purchase status",
+    purchaseRecorded: "A one-time purchase is recorded for this account. Export stays off until the sale opens.",
     purchaseActive: "Conversation export is confirmed for this account.",
     purchaseNone: "No purchase was confirmed for this account.",
     purchaseRefunded: "A refund or payment cancellation removed export access.",
@@ -126,6 +127,7 @@ const MESSAGES = {
     buyPro: "Pro 구매 — 일회성 4,900원",
     restorePurchase: "구매 복원",
     checkPurchase: "구매 상태 확인",
+    purchaseRecorded: "이 계정에 일회성 구매 기록이 있습니다. 판매를 시작하기 전에는 내보내기가 열리지 않습니다.",
     purchaseActive: "이 계정의 대화 내보내기가 확인되었습니다.",
     purchaseNone: "이 계정에서 확인된 구매가 없습니다.",
     purchaseRefunded: "환불 또는 결제 취소로 내보내기 권한이 없습니다.",
@@ -1142,6 +1144,7 @@ const SALE = Object.freeze({
   fullExportVerified: false,
   provider: "paddle",
   apiBase: "",
+  statusBase: "https://dot-copy-paste.vercel.app",
   productId: PRODUCT_ID,
   amount: 4900,
   currency: "KRW",
@@ -1157,7 +1160,7 @@ function purchasePresentation(sale = SALE) {
 return { PRODUCT_ID, SALE, purchasePresentation };
 })();
 
-const { readEntitlement, entitlementFromServer, mayExport, statusMessageKey } = (() => {
+const { readEntitlement, entitlementFromServer, readPurchaseStatus, mayExport, statusMessageKey } = (() => {
 
 async function readEntitlement({ storage, sale = SALE, request } = {}) {
   const stored = await readStorage(storage);
@@ -1194,14 +1197,26 @@ function entitlementFromServer(body) {
   return { entitled: false, state: "not-purchased", source: "server" };
 }
 
+async function readPurchaseStatus({ storage, sale = SALE, request } = {}) {
+  if (!sale?.statusBase) return readEntitlement({ storage, sale, request });
+  if (typeof request !== "function") return { entitled: false, state: "unavailable", source: "local-config" };
+  const stored = await readStorage(storage);
+  const token = typeof stored?.licenseSession?.token === "string" ? stored.licenseSession.token : "";
+  try {
+    return entitlementFromServer(await request({ token }));
+  } catch {
+    return { entitled: false, state: "unavailable", source: "server" };
+  }
+}
+
 function mayExport(entitlement) {
   return entitlement?.entitled === true && entitlement.state === "entitled" && entitlement.source === "server";
 }
 
-function statusMessageKey(entitlement) {
+function statusMessageKey(entitlement, { saleOpen = false } = {}) {
   switch (entitlement?.state) {
     case "entitled":
-      return "purchaseActive";
+      return saleOpen ? "purchaseActive" : "purchaseRecorded";
     case "not-purchased":
       return "purchaseNone";
     case "refunded":
@@ -1219,7 +1234,7 @@ async function readStorage(storage) {
   return stored && typeof stored === "object" ? stored : {};
 }
 
-return { readEntitlement, entitlementFromServer, mayExport, statusMessageKey };
+return { readEntitlement, entitlementFromServer, readPurchaseStatus, mayExport, statusMessageKey };
 })();
 
 const { readConfirmedTime, readConversationTitle, sanitizeTitle, formatExportDate, exportFilename, exportScope, collectMessages, buildConversationExport } = (() => {
@@ -2253,7 +2268,7 @@ startApp({
   chrome,
   window,
   document,
-  build: "0b6799485754"
+  build: "91a2c96ddb32"
 }).catch((error) => {
   const name = error && typeof error.name === "string" ? error.name : "Error";
   console.error("[Dot Copy Paste]", name);

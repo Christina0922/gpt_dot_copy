@@ -1,4 +1,13 @@
+import { SALE } from "../src/sale.js";
 import { wirePopup } from "../src/popup-controller.js";
+
+async function licenseRequest({ token }) {
+  if (!SALE.statusBase) return { source: "local-config", state: "sale-closed" };
+  const headers = {};
+  if (token) headers.authorization = `Bearer ${token}`;
+  const response = await fetch(`${SALE.statusBase}/api/status`, { headers, credentials: "include" });
+  return response.json();
+}
 
 async function askPage(message) {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -14,7 +23,8 @@ async function askPage(message) {
 const popup = wirePopup(document, {
   chrome,
   version: chrome.runtime.getManifest().version,
-  askPage
+  askPage,
+  licenseRequest
 });
 
 popup.init().catch((error) => {

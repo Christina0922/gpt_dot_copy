@@ -1,7 +1,7 @@
 # Dot Copy Paste
 
 작업명: Dot Copy Paste  
-버전: 0.2.4  
+버전: 0.2.5  
 공개 제품명과 상표 검토: 완료되지 않음
 
 이 확장프로그램은 OpenAI의 공식 제품이나 제휴 제품이 아닙니다.
@@ -14,7 +14,8 @@
 
 - 프로젝트: `D:\1000_b_project\gpt_dot_copy`
 - 압축해제 설치 폴더: `D:\1000_b_project\gpt_dot_copy\extension`
-- 웹스토어 업데이트 ZIP: `D:\1000_b_project\gpt_dot_copy\dist\Dot-Copy-Paste-0.2.4.zip`
+- 웹스토어 업데이트 ZIP: `D:\1000_b_project\gpt_dot_copy\dist\Dot-Copy-Paste-0.2.5.zip`
+- 라이선스 서버: `https://dot-copy-paste.vercel.app` (판매는 준비 중이며, 이 주소는 실결제를 시작하지 않습니다)
 
 처음 파일은 `D:\1000_b_project\Dot_Copy_Paste`에 작성한 뒤 이 폴더로 통합했습니다. 그 원본 폴더는 삭제하지 않았습니다.
 
@@ -27,7 +28,7 @@ npm test
 scripts\package.cmd
 ```
 
-개발에 사용한 도구는 Node.js v24.5.0, npm 11.5.1, Chrome 155.0.8059.84입니다. `npm install`은 테스트용 jsdom만 설치합니다. 확장프로그램 실행에는 Node.js가 필요 없습니다.
+개발에 사용한 도구는 Node.js v24.5.0, npm 11.5.1, Chrome 155.0.8059.84입니다. `npm install`은 테스트용 jsdom과 라이선스 서버 라이브러리를 설치합니다. 확장프로그램 실행에는 Node.js가 필요 없습니다.
 
 ## 수동 설치
 
@@ -35,7 +36,7 @@ scripts\package.cmd
 2. 개발자 모드를 켭니다.
 3. 압축해제된 확장 프로그램을 로드합니다.
 4. `D:\1000_b_project\gpt_dot_copy\extension` 폴더를 선택합니다.
-5. 도구 모음에서 Dot Copy Paste 팝업을 열어 버전 0.2.4를 확인합니다. 구매 버튼은 ‘판매 준비 중’이며 결제 페이지로 이동하지 않습니다.
+5. 도구 모음에서 Dot Copy Paste 팝업을 열어 버전 0.2.5를 확인합니다. 구매 버튼은 ‘판매 준비 중’이며 결제 페이지로 이동하지 않습니다. 구매 상태 확인은 라이선스 서버에 세션 토큰만 묻습니다.
 
 이미 `D:\1000_b_project\Dot_Copy_Paste\extension`을 Chrome에 불러왔다면 그 항목을 제거하고 위 새 폴더를 다시 불러와야 합니다. 확장프로그램 ID와 클립보드 선택 권한이 그대로 유지된다고 보지 않습니다.
 
