@@ -11,3 +11,4 @@ chrome-smoke-profile/
 /dot-page*.htm
 .vercel
 .env*.local
+/sandbox-verify/extension/

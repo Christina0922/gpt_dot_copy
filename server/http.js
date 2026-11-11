@@ -1,6 +1,7 @@
 import { mailReady, sendLoginMail } from "./mail.js";
 import { renderPage } from "./pages.js";
 import { interpretNotification } from "./purchase.js";
+import { sandboxVerifyEnabled, withSandboxVerify } from "./sandbox-export.js";
 import { verifySignature } from "./signature.js";
 
 const CATALOG_PRODUCT_ID = "dot-copy-paste-export";
@@ -16,7 +17,7 @@ export function createLicenseHandler({ runtime = { kind: "missing" }, env = {}, 
 
     if (method === "GET" && path === "/api/health") return health(runtime, env);
     if (method === "POST" && path === "/api/session") return createSession(runtime, now);
-    if (method === "GET" && path === "/api/status") return readStatus(runtime, headers, now);
+    if (method === "GET" && path === "/api/status") return readStatus(runtime, env, headers, now);
     if (method === "POST" && path === "/api/logout") return logout(runtime, headers);
     if (method === "POST" && path === "/api/webhook") return webhook(runtime, env, headers, body, now);
     if (method === "POST" && path === "/api/restore") return restore(runtime, env, headers, body, now, mailer);
@@ -67,7 +68,8 @@ function healthBody(runtime, env, database) {
     database,
     paddle,
     mail: mailReady(env) ? "configured" : "missing",
-    fullExport: "unverified"
+    fullExport: "unverified",
+    sandboxExport: sandboxVerifyEnabled(env) ? "verify" : "off"
   };
 }
 
@@ -81,13 +83,13 @@ async function createSession(runtime, now) {
   }
 }
 
-async function readStatus(runtime, headers, now) {
+async function readStatus(runtime, env, headers, now) {
   if (!ready(runtime)) return json(503, { entitled: false, state: "unavailable", source: "server" });
   const token = bearer(headers.authorization) || readCookie(headers.cookie, "dcp_session");
   if (!token) return json(401, { entitled: false, state: "unauthorized", source: "server" });
   try {
     const result = await runtime.readStatus(token, now());
-    return json(result.status, result.body);
+    return json(result.status, withSandboxVerify(result.body, env));
   } catch {
     return json(503, { entitled: false, state: "unavailable", source: "server" });
   }

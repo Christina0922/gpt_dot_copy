@@ -28,6 +28,13 @@
 
 아직 실행하지 않은 항목은 실제 Dots 화면, Paddle Sandbox 결제, Paddle이 보낸 웹훅, 실제 메일 수신, 다른 브라우저에서의 구매 복원입니다. 도구 모음 팝업의 0.2.7 표시는 이번 브라우저 확인에 포함하지 않았습니다.
 
+같은 버전에서 이어서 확인한 항목:
+
+- 설치된 확장프로그램 `ehognagclijgdgdoedbonhmfnjddbbkc`를 새로고침한 뒤 카드 버전이 0.2.7이었습니다. 도구 모음 팝업에서 버전 0.2.7, 무료, 복사·붙여넣기 사용, 언어를 한국어에서 영어로 바꾼 뒤 다시 한국어로 되돌렸습니다. 영어 화면에는 `Free`, `Use copy and paste buttons`, `Sale in preparation`이 보였습니다. 구매 버튼은 `판매 준비 중`이고 로그인 안내가 표시되었습니다. Dots 주소는 열지 않았습니다.
+- 로그인 링크는 메일을 보내지 않고 서버에서 확인했습니다. 첫 사용은 `303`이었고 구매 상태는 `sandbox`, `entitled: false`였습니다. 다시 열면 `400`으로 이미 사용한 링크였고, 만료된 링크도 `400`이었습니다. 응답에 토큰은 다시 나오지 않았습니다. 확인용 계정은 지웠고 계정 수는 1건, 구매는 0건으로 돌아왔습니다. 실제 메일 수신은 아닙니다.
+- Sandbox 검증용 확장프로그램은 `sandbox-verify/extension`에만 만들고 판매 ZIP에는 넣지 않았습니다. 그 빌드는 Sandbox 구매와 `exportVerify`가 있을 때만 불러온 메시지를 내보냅니다. Live 권한으로는 내보내지 않습니다. 판매용 코드는 Sandbox 구매를 Pro로 받지 않습니다. 로컬 검증 서버는 `127.0.0.1:8787`이며 판매는 `preparing`입니다.
+- 프로덕션 배포 `https://dot-copy-paste-opxkpqdu9-yoonjeongchos-projects.vercel.app`의 health는 `sale: preparing`, `sandboxExport: off`입니다. 되돌릴 주소는 `https://dot-copy-paste-5rmcvw1m7-yoonjeongchos-projects.vercel.app`입니다.
+
 ## 0.2.6 (2026-11-12)
 
 이 기록은 실제 Dots 화면 검증이 아닙니다. Dots 주소는 다시 열지 않았고, 일반 ChatGPT로 지원 범위를 넓히지 않았습니다. 판매는 준비 중이며 `open`은 `false`입니다. main 병합, 스토어 제출, 판매 개시는 하지 않았습니다.

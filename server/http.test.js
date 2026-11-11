@@ -375,8 +375,79 @@ test("restore requests are limited and a live purchase stays separate from Sandb
   const liveStatus = await live({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${liveBuyer.token}` } });
   assert.equal(liveStatus.body.state, "entitled");
   assert.equal(liveStatus.body.channel, "live");
+  assert.equal(liveStatus.body.exportVerify, undefined);
   const sandboxStatus = await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${buyer.token}` } });
   assert.equal(sandboxStatus.body.state, "sandbox");
   assert.equal(sandboxStatus.body.channel, "sandbox");
   assert.equal(sandboxStatus.body.entitled, false);
+  assert.equal(sandboxStatus.body.exportVerify, undefined);
+});
+
+test("a login link can be used once and then expires without sending mail", async () => {
+  const { runtime, handle } = handler(createMemoryRuntime(), {
+    mailer() {
+      throw new Error("mail-should-not-send");
+    }
+  });
+  const buyer = (await handle({ method: "POST", path: "/api/session" })).body;
+  await postWebhook(handle, payload(buyer.accountId, { transactionId: "txn_link", eventId: "evt_link" }));
+  const issued = await runtime.issueLink({ accountId: buyer.accountId, email: "buyer@example.com", now });
+  assert.equal(issued.ok, true);
+  const first = await handle({ method: "GET", path: `/api/consume?token=${issued.token}` });
+  assert.equal(first.status, 303);
+  assert.equal(first.headers.location, "/restore/done");
+  assert.equal(first.body.includes(issued.token), false);
+  const cookie = /dcp_session=([a-f0-9]{64})/.exec(first.headers["set-cookie"]);
+  const restored = await handle({ method: "GET", path: "/api/status", headers: { cookie: `dcp_session=${cookie[1]}` } });
+  assert.equal(restored.body.state, "sandbox");
+  assert.equal(restored.body.entitled, false);
+  assert.equal(restored.body.channel, "sandbox");
+  const reused = await handle({ method: "GET", path: `/api/consume?token=${issued.token}` });
+  assert.equal(reused.status, 400);
+  assert.equal(reused.body.includes("이미 사용한 링크입니다"), true);
+  assert.equal(reused.body.includes(issued.token), false);
+  const staleLink = await runtime.issueLink({
+    accountId: buyer.accountId,
+    email: "buyer@example.com",
+    now: now - LOGIN_LINK_TTL_MS - 1
+  });
+  const stale = await handle({ method: "GET", path: `/api/consume?token=${staleLink.token}` });
+  assert.equal(stale.status, 400);
+  assert.equal(stale.body.includes("만료된 링크입니다"), true);
+  assert.equal(stale.body.includes(staleLink.token), false);
+});
+
+test("sandbox verify export is available only in the sandbox test environment", async () => {
+  const verify = createLicenseHandler({
+    runtime: createMemoryRuntime(),
+    env: { ...env, DCP_SANDBOX_EXPORT: "verify" },
+    now: () => now,
+    mailer() {
+      throw new Error("mail-should-not-send");
+    }
+  });
+  const health = await verify({ method: "GET", path: "/api/health" });
+  assert.equal(health.body.sale, "preparing");
+  assert.equal(health.body.sandboxExport, "verify");
+  const buyer = (await verify({ method: "POST", path: "/api/session" })).body;
+  const raw = JSON.stringify(payload(buyer.accountId, { eventId: "evt_verify", transactionId: "txn_verify" }));
+  await verify({
+    method: "POST",
+    path: "/api/webhook",
+    headers: { "paddle-signature": signBody(raw, secret, now) },
+    body: raw
+  });
+  const status = await verify({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${buyer.token}` } });
+  assert.equal(status.body.entitled, false);
+  assert.equal(status.body.state, "sandbox");
+  assert.equal(status.body.channel, "sandbox");
+  assert.equal(status.body.exportVerify, "sandbox");
+  const mixed = createLicenseHandler({
+    runtime: createMemoryRuntime(),
+    env: { ...env, DCP_PADDLE_ENV: "live", DCP_SANDBOX_EXPORT: "verify" },
+    now: () => now
+  });
+  const liveHealth = await mixed({ method: "GET", path: "/api/health" });
+  assert.equal(liveHealth.body.sandboxExport, "off");
+  assert.equal(liveHealth.body.sale, "preparing");
 });

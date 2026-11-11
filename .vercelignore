@@ -10,3 +10,4 @@ chrome-smoke-profile
 .env
 .env.*
 .vercel
+sandbox-verify

@@ -3,7 +3,9 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const extensionRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "extension");
+const extensionRoot = process.env.DCP_EXTENSION_ROOT
+  ? process.env.DCP_EXTENSION_ROOT
+  : join(dirname(fileURLToPath(import.meta.url)), "..", "extension");
 const order = [
   "src/settings.js",
   "src/i18n.js",

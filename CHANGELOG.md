@@ -4,6 +4,7 @@
 
 - A Sandbox purchase is stored separately and does not become a live entitlement. Logout removes only that browser session, sessions expire after 30 days, and restore requests are rate limited.
 - The Sandbox setup tool stops when it sees a live key and does not call the live Paddle API. It reuses an existing Dot Copy Paste product instead of creating a duplicate.
+- A separate Sandbox verification build can export loaded messages after a Sandbox purchase. The store package does not include that path, and a Sandbox purchase is still not a live purchase.
 
 ## 0.2.6
 

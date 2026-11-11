@@ -309,6 +309,20 @@ export function createPostgresStore(databaseUrl) {
       const expiresAt = new Date(now + SESSION_TTL_MS).toISOString();
       await sql`INSERT INTO dcp_accounts (token_hash, account_id, expires_at) VALUES (${sha256(sessionToken)}, ${link.account_id}, ${expiresAt})`;
       return { ok: true, accountId: link.account_id, token: sessionToken };
+    },
+    async removeAccount(accountId) {
+      if (!/^[a-f0-9]{32}$/.test(accountId || "")) return false;
+      await ensureSchema();
+      const purchases = await sql`SELECT transaction_id FROM dcp_purchases WHERE account_id = ${accountId}`;
+      for (const row of purchases) {
+        await sql`DELETE FROM dcp_adjustments WHERE transaction_id = ${row.transaction_id}`;
+        await sql`DELETE FROM dcp_events WHERE transaction_id = ${row.transaction_id}`;
+      }
+      await sql`DELETE FROM dcp_purchases WHERE account_id = ${accountId}`;
+      await sql`DELETE FROM dcp_login_links WHERE account_id = ${accountId}`;
+      await sql`DELETE FROM dcp_emails WHERE account_id = ${accountId}`;
+      await sql`DELETE FROM dcp_accounts WHERE account_id = ${accountId}`;
+      return true;
     }
   };
 }
