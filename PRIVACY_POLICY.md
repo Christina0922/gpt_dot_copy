@@ -1,8 +1,8 @@
 # Privacy Policy — Dot Copy Paste
 
-Last updated: November 11, 2026
+Last updated: November 12, 2026
 
-Dot Copy Paste is an independent Chrome extension. It is not an official OpenAI product and is not affiliated with, endorsed by, or sponsored by OpenAI. Copy and paste guidance are free. Exporting the open dot conversation is a separate one-time feature. Version 0.2.5 does not sell it and does not send the conversation to a server.
+Dot Copy Paste is an independent Chrome extension. It is not an official OpenAI product and is not affiliated with, endorsed by, or sponsored by OpenAI. Copy and paste guidance are free. Exporting the open dot conversation is a separate one-time feature. Version 0.2.6 does not sell it and does not send the conversation to a server.
 
 The current policy is this file. `archive/Dot_Copy_Paste_Privacy_Policy_2026-10-19.docx` is an old snapshot from October 19, 2026. It is not the policy for the current extension.
 

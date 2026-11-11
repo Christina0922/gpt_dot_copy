@@ -55,7 +55,7 @@ test("popup has no clipboard permission menu and does not start a payment", asyn
   let asked = 0;
   const popup = wirePopup(doc, {
     chrome,
-    version: "0.2.5",
+    version: "0.2.6",
     askPage() {
       asked += 1;
       return { ok: true, code: "exported-full" };
@@ -71,11 +71,14 @@ test("popup has no clipboard permission menu and does not start a payment", asyn
   assert.equal(doc.querySelector("input[type='email']"), null);
   assert.equal(chrome.calls.includes("request"), false);
   assert.equal(chrome.calls.includes("remove"), false);
+  assert.equal(doc.querySelector("[data-i18n='exportShort']").textContent, "Only the messages loaded now are saved.");
+  assert.equal(doc.querySelector("[data-i18n='proShort']").textContent, "Pro one-time KRW 4,900 · no automatic renewal");
+  assert.equal(doc.querySelector("[data-i18n='freeStatus']").textContent, "Free");
+  assert.equal(doc.querySelector("details").open, false);
   assert.equal(doc.querySelector("[data-i18n='domUnverified']").textContent, "Copy and paste buttons appear only on a ChatGPT dot conversation page.");
-  assert.equal(doc.querySelector("[data-role='version']").textContent, "0.2.5");
+  assert.equal(doc.querySelector("[data-role='version']").textContent, "0.2.6");
   assert.equal(doc.querySelector("[data-action='buy-pro']").disabled, true);
   assert.equal(doc.querySelector("[data-action='buy-pro']").textContent, "Sale in preparation");
-  assert.equal(doc.querySelector("[data-i18n='proPrice']").textContent, "Buy Pro — one-time KRW 4,900. There is no monthly subscription and no automatic renewal. Later features are not included.");
   assert.equal(doc.querySelector("[data-role='purchase-status']").textContent, "No purchase was confirmed for this account.");
   assert.equal(doc.querySelector("[data-action='restore-purchase']").getAttribute("href"), "https://dot-copy-paste.vercel.app/restore");
   assert.equal(asked, 0);
@@ -84,4 +87,27 @@ test("popup has no clipboard permission menu and does not start a payment", asyn
   assert.equal(asked, 0);
   assert.equal(doc.querySelector("[data-setting='enabled']").checked, true);
   assert.equal(chrome.storageState.settings.enabled, true);
+});
+
+test("a missing login session asks for sign-in and does not export", async () => {
+  const doc = popupDom();
+  const chrome = fakeChrome();
+  let asked = 0;
+  const popup = wirePopup(doc, {
+    chrome,
+    version: "0.2.6",
+    askPage() {
+      asked += 1;
+      return { ok: true, code: "exported-full" };
+    },
+    licenseRequest() {
+      return { source: "server", entitled: false, state: "unauthorized" };
+    }
+  });
+  await popup.init();
+  assert.equal(doc.querySelector("[data-role='purchase-status']").textContent, "Sign in or restore a purchase to check it.");
+  doc.querySelector("[data-action='export']").click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(asked, 0);
+  assert.equal(doc.querySelector("[data-action='buy-pro']").disabled, true);
 });

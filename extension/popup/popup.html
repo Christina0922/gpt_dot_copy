@@ -8,45 +8,63 @@
   </head>
   <body>
     <main>
-      <h1 data-i18n="popupTitle">Dot Copy Paste</h1>
-      <p data-i18n="popupIntro"></p>
-      <p class="notice" data-i18n="domUnverified"></p>
-      <label class="row">
-        <input data-setting="enabled" type="checkbox" />
-        <span data-i18n="enabledLabel"></span>
-      </label>
-      <label class="field">
-        <span data-i18n="languageLabel"></span>
-        <select data-setting="language">
-          <option value="en">English</option>
-          <option value="ko">Korean</option>
-        </select>
-      </label>
+      <header class="header">
+        <img src="../icons/icon32.png" width="32" height="32" alt="" />
+        <div class="title-block">
+          <h1 data-i18n="popupTitle">Dot Copy Paste</h1>
+          <p class="meta"><span data-i18n="versionLabel"></span> <span data-role="version"></span></p>
+        </div>
+        <p class="badge" data-i18n="freeStatus"></p>
+      </header>
+      <section>
+        <h2 data-i18n="basicHeading"></h2>
+        <label class="row">
+          <input data-setting="enabled" type="checkbox" />
+          <span data-i18n="enabledLabel"></span>
+        </label>
+        <label class="row">
+          <span data-i18n="languageLabel"></span>
+          <select data-setting="language">
+            <option value="en">English</option>
+            <option value="ko">Korean</option>
+          </select>
+        </label>
+      </section>
       <section>
         <h2 data-i18n="exportHeading"></h2>
-        <p class="notice" data-i18n="exportLimit"></p>
-        <label class="field">
+        <p class="notice" data-i18n="exportShort"></p>
+        <label class="row">
           <span data-i18n="exportFormat"></span>
           <select data-setting="export-format">
             <option value="txt" data-i18n="exportTxt"></option>
             <option value="markdown" data-i18n="exportMarkdown"></option>
           </select>
         </label>
+        <button type="button" data-action="export" data-i18n="exportAction"></button>
+      </section>
+      <section>
+        <h2 data-i18n="purchaseHeading"></h2>
+        <p class="notice" data-i18n="proShort"></p>
+        <button type="button" data-action="buy-pro"></button>
         <div class="actions">
-          <button type="button" data-action="export" data-i18n="exportAction"></button>
-        </div>
-        <p class="notice" data-i18n="proPrice"></p>
-        <p class="meta" data-i18n="purchaseSeller"></p>
-        <div class="actions">
-          <button type="button" data-action="buy-pro"></button>
           <a data-action="restore-purchase" data-i18n="restorePurchase" href=""></a>
           <button type="button" data-action="purchase-status" data-i18n="checkPurchase"></button>
         </div>
         <p class="status" data-role="purchase-status" role="status" aria-live="polite"></p>
       </section>
-      <p class="meta"><span data-i18n="versionLabel"></span> <span data-role="version"></span></p>
-      <p class="meta" data-i18n="unofficial"></p>
-      <p class="meta" data-i18n="trademark"></p>
+      <details class="details">
+        <summary data-i18n="detailsLink"></summary>
+        <p data-i18n="domUnverified"></p>
+        <p data-i18n="unofficial"></p>
+        <p data-i18n="trademark"></p>
+        <p data-i18n="purchaseSeller"></p>
+        <p class="links">
+          <a data-guide="/price" data-i18n="guidePrice" href=""></a>
+          <a data-guide="/privacy" data-i18n="guidePrivacy" href=""></a>
+          <a data-guide="/terms" data-i18n="guideTerms" href=""></a>
+          <a data-guide="/refund" data-i18n="guideRefund" href=""></a>
+        </p>
+      </details>
     </main>
     <script type="module" src="popup.js"></script>
   </body>

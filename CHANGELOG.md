@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.6
+
+- The popup uses a white background, blue accents, and separate sections for basic features, export, and purchase.
+- Long policy text sits behind Details and the license pages. The popup keeps the loaded-message limit, the one-time KRW 4,900 price, and the disabled sale button.
+- A status check without a login session asks the user to sign in or restore a purchase. It does not say that no purchase exists. Export still does not run without a confirmed purchase.
+
 ## 0.2.5
 
 - Added a separate license server at `https://dot-copy-paste.vercel.app`. The public purchase button stays in preparation and does not open a payment page.

@@ -1,6 +1,6 @@
 # Payments
 
-Dot Copy Paste does not open a live payment in version 0.2.5. The purchase button says the sale is in preparation and does not open a payment page. The license server is `https://dot-copy-paste.vercel.app`. It is a separate Vercel project named `dot-copy-paste`. It does not use the AI Status Monitor project or `geniusbrain.works`.
+Dot Copy Paste does not open a live payment in version 0.2.6. The purchase button says the sale is in preparation and does not open a payment page. The license server is `https://dot-copy-paste.vercel.app`. It is a separate Vercel project named `dot-copy-paste`. It does not use the AI Status Monitor project or `geniusbrain.works`.
 
 Another extension in the same workspace, AI Status Monitor, uses Paddle for a different one-time product priced in USD. That product, price, webhook, and license host are not reused here. This repository has no Paddle product for a one-time KRW 4,900 export.
 

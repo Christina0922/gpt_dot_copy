@@ -3,7 +3,7 @@
 Status: local draft for an update to the existing item. Not submitted.  
 Existing item: https://chromewebstore.google.com/detail/dot-copy-paste/ndpennnmcicncopijfkmplbmkndkcdej  
 Published version seen on October 23, 2026: 0.1.0  
-This package: 0.2.5
+This package: 0.2.6
 
 Dot Copy Paste is an independent extension. It is not affiliated with, endorsed by, or sponsored by OpenAI.
 

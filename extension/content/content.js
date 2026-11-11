@@ -58,6 +58,17 @@ const MESSAGES = {
     pasteUnavailable: "This button is off because the dot input cannot confirm a draft. Click the input and press Ctrl+V. Selection restore and undo are not guaranteed. Nothing was changed.",
     popupTitle: "Dot Copy Paste",
     popupIntro: "Turns copy and paste buttons on or off and shows the version.",
+    freeStatus: "Free",
+    basicHeading: "Basic features",
+    purchaseHeading: "Purchase",
+    detailsLink: "Details",
+    exportShort: "Only the messages loaded now are saved.",
+    proShort: "Pro one-time KRW 4,900 · no automatic renewal",
+    purchaseSignIn: "Sign in or restore a purchase to check it.",
+    guidePrice: "Price",
+    guidePrivacy: "Privacy",
+    guideTerms: "Terms",
+    guideRefund: "Refunds",
     enabledLabel: "Use copy and paste buttons",
     languageLabel: "Language",
     languageKo: "Korean",
@@ -108,6 +119,17 @@ const MESSAGES = {
     pasteUnavailable: "닷 입력창의 초안 반영을 확인할 수 없어 이 버튼은 사용하지 않습니다. 입력창을 누른 뒤 Ctrl+V를 사용해 주세요. 선택 영역 복원과 실행 취소는 보장하지 않습니다. 입력한 내용은 바꾸지 않았습니다.",
     popupTitle: "Dot Copy Paste",
     popupIntro: "복사·붙여넣기 버튼을 켜거나 끄고, 버전을 확인합니다.",
+    freeStatus: "무료",
+    basicHeading: "기본 기능",
+    purchaseHeading: "구매",
+    detailsLink: "자세히 보기",
+    exportShort: "현재 불러온 메시지만 저장합니다.",
+    proShort: "Pro 일회성 4,900원 · 자동 갱신 없음",
+    purchaseSignIn: "구매 확인을 위해 로그인하거나 구매를 복원해 주세요.",
+    guidePrice: "가격",
+    guidePrivacy: "개인정보",
+    guideTerms: "약관",
+    guideRefund: "환불",
     enabledLabel: "복사·붙여넣기 버튼 사용",
     languageLabel: "언어",
     languageKo: "한국어",
@@ -1187,6 +1209,9 @@ function entitlementFromServer(body) {
   if (body.state === "unavailable") {
     return { entitled: false, state: "unavailable", source: "server" };
   }
+  if (body.state === "unauthorized") {
+    return { entitled: false, state: "unauthorized", source: "server" };
+  }
   const matches = body.entitled === true
     && body.state === "entitled"
     && body.productId === PRODUCT_ID
@@ -1219,6 +1244,8 @@ function statusMessageKey(entitlement, { saleOpen = false } = {}) {
       return saleOpen ? "purchaseActive" : "purchaseRecorded";
     case "not-purchased":
       return "purchaseNone";
+    case "unauthorized":
+      return "purchaseSignIn";
     case "refunded":
       return "purchaseRefunded";
     case "sale-closed":
@@ -2268,7 +2295,7 @@ startApp({
   chrome,
   window,
   document,
-  build: "91a2c96ddb32"
+  build: "a8ba71e0f327"
 }).catch((error) => {
   const name = error && typeof error.name === "string" ? error.name : "Error";
   console.error("[Dot Copy Paste]", name);

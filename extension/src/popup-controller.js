@@ -18,13 +18,6 @@ const EXPORT_CODES = {
 export function wirePopup(doc, { chrome, version, askPage, licenseRequest } = {}) {
   const storage = chrome.storage.local;
   const nodes = {
-    title: doc.querySelector("[data-i18n='popupTitle']"),
-    intro: doc.querySelector("[data-i18n='popupIntro']"),
-    enabledLabel: doc.querySelector("[data-i18n='enabledLabel']"),
-    languageLabel: doc.querySelector("[data-i18n='languageLabel']"),
-    unofficial: doc.querySelector("[data-i18n='unofficial']"),
-    trademark: doc.querySelector("[data-i18n='trademark']"),
-    domUnverified: doc.querySelector("[data-i18n='domUnverified']"),
     version: doc.querySelector("[data-role='version']"),
     versionLabel: doc.querySelector("[data-i18n='versionLabel']"),
     enabled: doc.querySelector("[data-setting='enabled']"),
@@ -57,6 +50,10 @@ export function wirePopup(doc, { chrome, version, askPage, licenseRequest } = {}
       node.textContent = t(node.dataset.i18n);
     }
     nodes.version.textContent = version;
+    const origin = typeof SALE.statusBase === "string" ? SALE.statusBase.replace(/\/$/, "") : "";
+    for (const link of doc.querySelectorAll("[data-guide]")) {
+      link.href = origin ? `${origin}${link.dataset.guide}` : "";
+    }
     nodes.enabled.checked = settings.enabled;
     nodes.language.value = language;
     for (const option of nodes.language.options) {

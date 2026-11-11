@@ -3,7 +3,7 @@
 상태: 기존 항목의 업데이트용 로컬 초안. 제출하지 않았습니다.  
 기존 항목: https://chromewebstore.google.com/detail/dot-copy-paste/ndpennnmcicncopijfkmplbmkndkcdej  
 2026-10-23에 확인한 게시 버전: 0.1.0  
-이 패키지: 0.2.5
+이 패키지: 0.2.6
 
 이 확장프로그램은 OpenAI의 공식 제품이 아니며, OpenAI의 제휴·후원·보증을 받지 않습니다.
 
