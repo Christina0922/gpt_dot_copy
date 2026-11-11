@@ -88,12 +88,21 @@ test("refund updates the buyer only, and a store outage does not revoke the purc
   const refund = post(api, {
     event_id: "evt_refund",
     event_type: "adjustment.updated",
-    data: { id: "adj_1", action: "refund", status: "approved", transaction_id: "txn_1" }
+    occurred_at: "2026-11-11T00:10:00.000Z",
+    data: {
+      id: "adj_1",
+      action: "refund",
+      type: "full",
+      status: "approved",
+      transaction_id: "txn_1",
+      currency_code: "KRW",
+      totals: { total: "4900", currency_code: "KRW" }
+    }
   });
   assert.equal(refund.granted, false);
   assert.equal(api.status(`Bearer ${buyer.token}`).body.state, "refunded");
   post(api, {
-    event_id: "evt_refund_again",
+    event_id: "evt_not_used",
     event_type: "transaction.refunded",
     data: { id: "txn_1", status: "refunded" }
   });

@@ -8,6 +8,7 @@ export function createMemoryStore() {
     byAccount: new Map(),
     emails: new Map(),
     loginLinks: new Map(),
+    adjustments: new Map(),
     failReads: false
   };
 }

@@ -162,12 +162,108 @@ test("refund revokes the recorded purchase and a restore link is single-use", as
   const refund = await postWebhook(handle, {
     event_id: "evt_refund",
     event_type: "adjustment.updated",
-    data: { id: "adj_1", action: "refund", status: "approved", transaction_id: "txn_1" }
+    occurred_at: "2026-11-11T00:10:00.000Z",
+    data: {
+      id: "adj_1",
+      action: "refund",
+      type: "full",
+      status: "approved",
+      transaction_id: "txn_1",
+      currency_code: "KRW",
+      totals: { total: "4900", currency_code: "KRW" }
+    }
   });
   assert.equal(refund.body.granted, false);
   const after = await handle({ method: "GET", path: "/api/status", headers: { cookie: `dcp_session=${cookie[1]}` } });
   assert.equal(after.body.state, "refunded");
   assert.equal(after.body.entitled, false);
+});
+
+function adjustment(eventId, overrides = {}) {
+  const currency = overrides.currency || "KRW";
+  return {
+    event_id: eventId,
+    event_type: overrides.eventType || "adjustment.updated",
+    occurred_at: overrides.occurredAt,
+    data: {
+      id: overrides.id || "adj_1",
+      action: overrides.action || "refund",
+      type: overrides.type || "partial",
+      status: overrides.status || "approved",
+      transaction_id: overrides.transactionId || "txn_1",
+      currency_code: currency,
+      totals: { total: String(overrides.amount ?? 0), currency_code: currency },
+      items: overrides.items
+    }
+  };
+}
+
+test("approved refunds keep the final entitlement through partial, duplicate, and out-of-order notices", async () => {
+  const { handle } = handler();
+  const buyer = (await handle({ method: "POST", path: "/api/session" })).body;
+  assert.equal((await postWebhook(handle, payload(buyer.accountId))).body.granted, true);
+  assert.equal((await postWebhook(handle, {
+    event_id: "evt_unused",
+    event_type: "transaction.refunded",
+    data: { id: "txn_1", status: "refunded" }
+  })).body.granted, false);
+  assert.equal((await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${buyer.token}` } })).body.state, "entitled");
+
+  await postWebhook(handle, adjustment("evt_pending", { status: "pending_approval", type: "full", amount: 4900, occurredAt: "2026-11-11T00:01:00.000Z" }));
+  await postWebhook(handle, adjustment("evt_rejected", { status: "rejected", type: "full", amount: 4900, occurredAt: "2026-11-11T00:02:00.000Z" }));
+  await postWebhook(handle, adjustment("evt_credit", { action: "credit", type: "full", amount: 4900, occurredAt: "2026-11-11T00:02:30.000Z" }));
+  let status = await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${buyer.token}` } });
+  assert.equal(status.body.state, "entitled");
+
+  await postWebhook(handle, adjustment("evt_partial", { id: "adj_partial", amount: 1000, occurredAt: "2026-11-11T00:03:00.000Z" }));
+  await postWebhook(handle, adjustment("evt_partial", { id: "adj_partial", amount: 1000, occurredAt: "2026-11-11T00:03:00.000Z" }));
+  await postWebhook(handle, adjustment("evt_partial_old", { id: "adj_partial", status: "pending_approval", amount: 1000, occurredAt: "2026-11-11T00:02:30.000Z" }));
+  status = await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${buyer.token}` } });
+  assert.equal(status.body.state, "entitled");
+  assert.equal(status.body.refund, "partial");
+  assert.equal(status.body.refundedAmount, 1000);
+
+  await postWebhook(handle, adjustment("evt_other_product", {
+    id: "adj_other",
+    type: "full",
+    amount: 4900,
+    occurredAt: "2026-11-11T00:04:00.000Z",
+    items: [{ type: "full", amount: "4900", price: { product_id: "pro_other" } }]
+  }));
+  status = await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${buyer.token}` } });
+  assert.equal(status.body.state, "entitled");
+
+  await postWebhook(handle, adjustment("evt_rest", { id: "adj_rest", amount: 3900, occurredAt: "2026-11-11T00:05:00.000Z" }));
+  status = await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${buyer.token}` } });
+  assert.equal(status.body.state, "refunded");
+  assert.equal(status.body.entitled, false);
+
+  const later = (await handle({ method: "POST", path: "/api/session" })).body;
+  await postWebhook(handle, adjustment("evt_early", {
+    id: "adj_early",
+    transactionId: "txn_early",
+    type: "full",
+    amount: 4900,
+    eventType: "adjustment.created",
+    occurredAt: "2026-11-11T00:06:00.000Z"
+  }));
+  const completed = await postWebhook(handle, payload(later.accountId, { eventId: "evt_early_paid", transactionId: "txn_early" }));
+  assert.equal(completed.body.granted, false);
+  status = await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${later.token}` } });
+  assert.equal(status.body.state, "refunded");
+});
+
+test("the mail transport is SMTP and an API-key variable is not the password", async () => {
+  const missing = createLicenseHandler({
+    runtime: createMemoryRuntime(),
+    env: { ...env, DCP_EMAIL_FROM: "buyer@example.com", DCP_EMAIL_API_KEY: "not-a-smtp-password" }
+  });
+  assert.equal((await missing({ method: "GET", path: "/api/health" })).body.mail, "missing");
+  const configured = createLicenseHandler({
+    runtime: createMemoryRuntime(),
+    env: { ...env, DCP_EMAIL_FROM: "buyer@example.com", DCP_EMAIL_SMTP_PASSWORD: "smtp-password" }
+  });
+  assert.equal((await configured({ method: "GET", path: "/api/health" })).body.mail, "configured");
 });
 
 test("a failed mail send is not reported as sent and a mismatched link does not change accounts", async () => {

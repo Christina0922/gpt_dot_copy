@@ -23,10 +23,14 @@ No Paddle Sandbox product or price exists for this extension yet. The server has
 
 This product has no account system. Restore is a one-time link sent to the payment email. The server stores a hash of a random single-use token and a short expiry. Opening that link is the proof of mailbox ownership. Typing the email alone does not grant the purchase.
 
-The restore link is implemented. It expires in 15 minutes and can be used once. Opening it does not create a payment. No message was sent: the existing Gmail app password is stored as a sensitive variable on the other site and was not readable for reuse. These server-only variables remain:
+The restore link is implemented. It expires in 15 minutes and can be used once. Opening it does not create a payment. Mail is sent with SMTP through Nodemailer, not with an external mail HTTP API. Gmail is the default SMTP host. The Gmail app password is an SMTP password, not an API key, and the server does not read `DCP_EMAIL_API_KEY`.
 
-- `DCP_EMAIL_API_KEY`
-- `DCP_EMAIL_FROM`
+No restore message has been sent or received. The app password from another product is not copied. Add these server-only variables on the `dot-copy-paste` project:
+
+- `DCP_EMAIL_FROM`: the mailbox that sends the link
+- `DCP_EMAIL_SMTP_PASSWORD`: the SMTP password or Gmail app password for that mailbox
+- `DCP_EMAIL_SMTP_HOST`: optional, default `smtp.gmail.com`
+- `DCP_EMAIL_SMTP_PORT`: optional, default `465`
 
 ## When a connection is added
 
@@ -38,6 +42,8 @@ Server-only environment variables:
 - `DCP_PADDLE_WEBHOOK_SECRET`: server-side webhook signing secret
 - `DCP_PADDLE_PRICE_ID`: one-time price id for KRW 4,900
 - `DCP_PADDLE_PRODUCT_ID`: product id for `dot-copy-paste-export`
+
+Subscribe the sandbox notification destination to `transaction.completed`, `adjustment.created`, and `adjustment.updated`. Do not subscribe to `transaction.refunded`. A refund removes access only when the adjustment action is `refund`, the status is `approved`, the currency matches, and the adjustment is for this product. `pending_approval` and `rejected` do not remove access. A partial refund keeps the purchase. A full refund, or partial refunds that add up to the full KRW 4900, removes it. An older notice does not overwrite a newer one. Live sale still needs a separate live product, API key, webhook secret, and price check.
 
 The provider transaction lookup origin in server code is `https://api.paddle.com`. The extension package does not include that origin, a checkout URL, or any of the secret values.
 

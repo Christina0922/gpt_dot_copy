@@ -5,7 +5,8 @@
 - Added a separate license server at `https://dot-copy-paste.vercel.app`. The public purchase button stays in preparation and does not open a payment page.
 - Purchase records use a Postgres database for this product only. The in-memory store remains a test double.
 - A payment-success page does not grant Pro. Signed notifications, duplicate events, and refund updates are covered by tests. A Paddle Sandbox product is not connected yet.
-- Purchase restore is a 15-minute, single-use email link. The mail sender is not connected yet, so no restore message was sent.
+- Purchase restore is a 15-minute, single-use email link. Mail uses SMTP. The password variable is `DCP_EMAIL_SMTP_PASSWORD`, and the server does not read `DCP_EMAIL_API_KEY`. No restore message was sent.
+- Refunds follow `adjustment.created` and `adjustment.updated`. `transaction.refunded` does not change access. A pending or rejected refund does not remove access. A partial refund keeps the purchase until approved amounts cover the full price.
 - The popup can ask the license server whether a purchase is recorded. Export stays off because the full thread is not verified on a live Dots screen.
 
 ## 0.2.4

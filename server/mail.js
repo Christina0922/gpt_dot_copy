@@ -1,7 +1,7 @@
 import { normalizeEmail } from "./login.js";
 
 export function mailReady(env = {}) {
-  return Boolean(cleanFrom(env.DCP_EMAIL_FROM) && cleanSecret(env.DCP_EMAIL_API_KEY));
+  return Boolean(cleanFrom(env.DCP_EMAIL_FROM) && smtpPassword(env));
 }
 
 export async function sendLoginMail({ to, link, env = {}, transport } = {}) {
@@ -14,7 +14,7 @@ export async function sendLoginMail({ to, link, env = {}, transport } = {}) {
     return result?.sent === true ? { sent: true } : { sent: false, reason: result?.reason || "not-sent" };
   }
   const from = cleanFrom(env.DCP_EMAIL_FROM);
-  const pass = cleanSecret(env.DCP_EMAIL_API_KEY);
+  const pass = smtpPassword(env);
   if (!from || !pass) return { sent: false, reason: "mail-not-configured" };
   try {
     const nodemailer = await import("nodemailer");
@@ -47,8 +47,9 @@ function cleanFrom(value) {
   return normalizeEmail(value);
 }
 
-function cleanSecret(value) {
+function smtpPassword(env) {
+  const value = env.DCP_EMAIL_SMTP_PASSWORD;
   if (typeof value !== "string") return "";
-  const secret = value.replace(/\s+/g, "");
-  return secret.length >= 8 ? secret : "";
+  const password = value.replace(/\s+/g, "");
+  return password.length >= 8 ? password : "";
 }

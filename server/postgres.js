@@ -1,7 +1,9 @@
 import { createHash, randomBytes } from "node:crypto";
 import { neon } from "@neondatabase/serverless";
+import { createMemoryStore } from "./accounts.js";
 import { emailHash } from "./login.js";
 import { LOGIN_LINK_TTL_MS } from "./login.js";
+import { applyDecision } from "./purchase.js";
 
 const PRODUCT_ID = "dot-copy-paste-export";
 
@@ -23,6 +25,16 @@ export function createPostgresStore(databaseUrl) {
           amount integer NOT NULL,
           currency text NOT NULL,
           status text NOT NULL
+        )`;
+        await sql`ALTER TABLE dcp_purchases ADD COLUMN IF NOT EXISTS refunded_amount integer NOT NULL DEFAULT 0`;
+        await sql`CREATE TABLE IF NOT EXISTS dcp_adjustments (
+          adjustment_id text PRIMARY KEY,
+          transaction_id text NOT NULL,
+          status text NOT NULL,
+          amount integer NOT NULL,
+          kind text NOT NULL,
+          product_ok boolean NOT NULL,
+          occurred_at timestamptz
         )`;
         await sql`CREATE TABLE IF NOT EXISTS dcp_events (
           event_id text PRIMARY KEY,
@@ -80,7 +92,7 @@ export function createPostgresStore(databaseUrl) {
         return { status: 401, body: { entitled: false, state: "unauthorized", source: "server" } };
       }
       const rows = await sql`
-        SELECT a.account_id, p.product_id, p.amount, p.currency, p.status
+        SELECT a.account_id, p.product_id, p.amount, p.currency, p.status, p.refunded_amount
         FROM dcp_accounts a
         LEFT JOIN dcp_purchases p ON p.account_id = a.account_id
         WHERE a.token_hash = ${sha256(token)}
@@ -91,8 +103,9 @@ export function createPostgresStore(databaseUrl) {
       if (!row.status) {
         return { status: 200, body: { entitled: false, state: "not-purchased", source: "server", productId: PRODUCT_ID } };
       }
+      const refundedAmount = Number(row.refunded_amount || 0);
       if (row.status === "refunded") {
-        return { status: 200, body: { entitled: false, state: "refunded", source: "server", productId: row.product_id } };
+        return { status: 200, body: { entitled: false, state: "refunded", source: "server", productId: row.product_id, refund: "full" } };
       }
       return {
         status: 200,
@@ -102,7 +115,9 @@ export function createPostgresStore(databaseUrl) {
           source: "server",
           productId: row.product_id,
           amount: Number(row.amount),
-          currency: row.currency
+          currency: row.currency,
+          refund: refundedAmount > 0 ? "partial" : "none",
+          refundedAmount
         }
       };
     },
@@ -116,43 +131,93 @@ export function createPostgresStore(databaseUrl) {
         RETURNING event_id
       `;
       if (!inserted.length) return { granted: false, duplicate: true, changed: false };
+      if (decision.action !== "grant" && decision.action !== "adjustment") {
+        return { granted: false, duplicate: false, changed: false };
+      }
+      const local = createMemoryStore();
+      const transactionId = decision.transactionId;
       if (decision.action === "grant") {
         const accounts = await sql`SELECT account_id FROM dcp_accounts WHERE account_id = ${decision.accountId} LIMIT 1`;
-        const existing = await sql`SELECT transaction_id FROM dcp_purchases WHERE transaction_id = ${decision.transactionId} LIMIT 1`;
-        if (!accounts.length || existing.length) {
-          return { granted: false, duplicate: existing.length > 0, changed: false };
-        }
+        if (accounts.length) local.accounts.set("seed", { accountId: decision.accountId });
+      }
+      const purchases = await sql`
+        SELECT transaction_id, account_id, product_id, amount, currency, status, refunded_amount
+        FROM dcp_purchases WHERE transaction_id = ${transactionId}
+      `;
+      if (purchases[0]) {
+        local.purchases.set(purchases[0].transaction_id, {
+          accountId: purchases[0].account_id,
+          productId: purchases[0].product_id,
+          amount: Number(purchases[0].amount),
+          currency: purchases[0].currency,
+          status: purchases[0].status,
+          refundedAmount: Number(purchases[0].refunded_amount || 0)
+        });
+        local.byAccount.set(purchases[0].account_id, purchases[0].transaction_id);
+      }
+      const adjustments = await sql`
+        SELECT adjustment_id, transaction_id, status, amount, kind, product_ok, occurred_at
+        FROM dcp_adjustments WHERE transaction_id = ${transactionId}
+      `;
+      for (const row of adjustments) {
+        local.adjustments.set(row.adjustment_id, {
+          transactionId: row.transaction_id,
+          status: row.status,
+          amount: Number(row.amount),
+          kind: row.kind,
+          productOk: row.product_ok === true || row.product_ok === "t" || row.product_ok === "true",
+          occurredAt: row.occurred_at ? new Date(row.occurred_at).getTime() : null
+        });
+      }
+      const result = applyDecision(local, decision);
+      const purchase = local.purchases.get(transactionId);
+      if (purchase) {
         await sql`
-          INSERT INTO dcp_purchases (transaction_id, account_id, product_id, amount, currency, status)
+          INSERT INTO dcp_purchases (transaction_id, account_id, product_id, amount, currency, status, refunded_amount)
           VALUES (
-            ${decision.transactionId},
-            ${decision.accountId},
-            ${decision.catalogProductId || decision.productId},
-            ${decision.amount},
-            ${decision.currency},
-            'active'
+            ${transactionId},
+            ${purchase.accountId},
+            ${purchase.productId},
+            ${purchase.amount},
+            ${purchase.currency},
+            ${purchase.status},
+            ${purchase.refundedAmount || 0}
           )
+          ON CONFLICT (transaction_id) DO UPDATE SET
+            status = EXCLUDED.status,
+            refunded_amount = EXCLUDED.refunded_amount
         `;
         const hash = emailHash(email);
         if (hash) {
           await sql`
             INSERT INTO dcp_emails (account_id, email_hash)
-            VALUES (${decision.accountId}, ${hash})
+            VALUES (${purchase.accountId}, ${hash})
             ON CONFLICT (account_id) DO UPDATE SET email_hash = EXCLUDED.email_hash
           `;
         }
-        return { granted: true, duplicate: false, changed: true };
       }
-      if (decision.action === "revoke") {
-        const updated = await sql`
-          UPDATE dcp_purchases
-          SET status = 'refunded'
-          WHERE transaction_id = ${decision.transactionId} AND status <> 'refunded'
-          RETURNING transaction_id
+      const adjustment = decision.adjustmentId ? local.adjustments.get(decision.adjustmentId) : null;
+      if (adjustment) {
+        await sql`
+          INSERT INTO dcp_adjustments (adjustment_id, transaction_id, status, amount, kind, product_ok, occurred_at)
+          VALUES (
+            ${decision.adjustmentId},
+            ${adjustment.transactionId},
+            ${adjustment.status},
+            ${adjustment.amount || 0},
+            ${adjustment.kind || "none"},
+            ${adjustment.productOk === true},
+            ${adjustment.occurredAt ? new Date(adjustment.occurredAt).toISOString() : null}
+          )
+          ON CONFLICT (adjustment_id) DO UPDATE SET
+            status = EXCLUDED.status,
+            amount = EXCLUDED.amount,
+            kind = EXCLUDED.kind,
+            product_ok = EXCLUDED.product_ok,
+            occurred_at = EXCLUDED.occurred_at
         `;
-        return { granted: false, duplicate: false, changed: updated.length > 0 };
       }
-      return { granted: false, duplicate: false, changed: false };
+      return result;
     },
     async accountIdForEmail(email) {
       await ensureSchema();
