@@ -49,6 +49,12 @@ async function postWebhook(handle, body, signedAt = now) {
   });
 }
 
+test("the private sandbox setup path is not available", async () => {
+  const { handle } = handler();
+  const hidden = await handle({ method: "POST", path: "/api/sandbox-setup" });
+  assert.equal(hidden.status, 404);
+});
+
 test("a rewritten page stays a page and does not grant a purchase", async () => {
   const { handle } = handler();
   const price = await handle({ method: "GET", path: "/api/page/price" });

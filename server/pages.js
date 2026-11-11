@@ -105,16 +105,32 @@ function sandboxPage(sandbox) {
   const setup = connected
     ? `<p>Sandbox 상품과 일회성 4,900원 가격이 연결되어 있습니다. 이 화면은 실결제 계정이 아닙니다.</p>
        <p id="sandbox-tax">세금 포함 여부와 한국 구매자 최종 청구액은 결제 화면의 합계로 확인합니다.</p>
+       <p id="sandbox-state">session=none</p>
        <button type="button" id="sandbox-pay">Sandbox 테스트 결제</button>
+       <button type="button" id="sandbox-status">Sandbox 권한 확인</button>
        <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
        <script>
          Paddle.Environment.set("sandbox");
          Paddle.Initialize({ token: ${JSON.stringify(sandbox.clientToken)}, checkout: { settings: { displayMode: "overlay", successUrl: ${JSON.stringify(sandbox.successUrl)} } } });
+         const stateNode = document.querySelector("#sandbox-state");
+         async function showSandboxState() {
+           const token = sessionStorage.getItem("dcp_sandbox_session") || "";
+           if (!/^[a-f0-9]{64}$/.test(token)) {
+             stateNode.textContent = "session=none";
+             return;
+           }
+           const response = await fetch("/api/status", { headers: { authorization: "Bearer " + token } });
+           const body = await response.json();
+           stateNode.textContent = ["state", "channel", "entitled", "exportVerify", "amount", "currency", "productId"].map((name) => name + "=" + (body[name] ?? "")).join(" ");
+         }
+         document.querySelector("#sandbox-status").addEventListener("click", showSandboxState);
          document.querySelector("#sandbox-pay").addEventListener("click", async () => {
            const session = await fetch("/api/session", { method: "POST" }).then((response) => response.json());
-           if (!session.accountId) return;
+           if (!session.accountId || !/^[a-f0-9]{64}$/.test(session.token || "")) return;
+           sessionStorage.setItem("dcp_sandbox_session", session.token);
            Paddle.Checkout.open({ items: [{ priceId: ${JSON.stringify(sandbox.priceId)}, quantity: 1 }], customData: { accountId: session.accountId } });
          });
+         showSandboxState();
        </script>`
     : `<p>Sandbox 상품이 아직 연결되지 않았습니다. 실결제처럼 처리하지 않습니다.</p>`;
   return documentPage("Sandbox 결제", `<h1>Sandbox 결제</h1>${setup}<p><a href="/purchase">공개 구매 화면은 판매 준비 중으로 유지됩니다.</a></p>`);
