@@ -8,6 +8,7 @@ export function renderPage({ path = "/", sandbox = null } = {}) {
     "/success": successPage(),
     "/failure": failurePage(),
     "/restore": restorePage(),
+    "/restore/open": restoreOpenPage(),
     "/restore/done": restoreDonePage(),
     "/privacy": privacyPage(),
     "/terms": termsPage(),
@@ -66,6 +67,30 @@ function restorePage() {
       <button type="submit">복원 링크 요청</button>
     </form>
     <p id="restore-result"></p>`);
+}
+
+function restoreOpenPage() {
+  return documentPage("구매 복원 확인", `
+    <h1>구매 복원 확인</h1>
+    <p>이 페이지를 연 것만으로는 로그인되지 않습니다. 메일 보안 검사가 링크를 미리 열어도 링크는 그대로 남습니다.</p>
+    <p>Opening this page does not sign you in. A mail security check that previews the link does not use it.</p>
+    <form method="post" action="/api/consume">
+      <input id="restore-token" name="token" type="hidden" value="">
+      <button type="submit">이 브라우저에서 확인 · Confirm in this browser</button>
+    </form>
+    <p id="restore-open-state">링크가 없으면 확인할 수 없습니다. The link is missing.</p>
+    <script>
+      const field = document.querySelector("#restore-token");
+      const state = document.querySelector("#restore-open-state");
+      const hash = location.hash.startsWith("#") ? location.hash.slice(1) : "";
+      const query = new URLSearchParams(location.search).get("token") || "";
+      const token = /^[a-f0-9]{64}$/.test(hash) ? hash : (/^[a-f0-9]{64}$/.test(query) ? query : "");
+      if (token) {
+        field.value = token;
+        state.textContent = "확인 버튼을 누르면 이 브라우저에서 구매 기록을 조회합니다. Press confirm to check the purchase in this browser.";
+      }
+      if (location.hash || location.search) history.replaceState(null, "", location.pathname);
+    </script>`);
 }
 
 function restoreDonePage() {

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createLicenseHandler } from "./http.js";
 import { LOGIN_LINK_TTL_MS } from "./login.js";
-import { mailConfig } from "./mail.js";
+import { loginMailContent, mailConfig } from "./mail.js";
 import { createMemoryRuntime, runtimeFromEnv } from "./runtime.js";
 import { signBody } from "./signature.js";
 
@@ -144,8 +144,21 @@ test("refund revokes the recorded purchase and a restore link is single-use", as
   });
   assert.equal(restore.body.sent, true);
   assert.equal(JSON.stringify(restore.body).includes("token"), false);
-  const token = new URL(sent[0].link).searchParams.get("token");
-  const consumed = await handle({ method: "GET", path: `/api/restore/consume?token=${token}&accountId=${other.accountId}` });
+  const opened = new URL(sent[0].link);
+  assert.equal(opened.protocol, "https:");
+  assert.equal(opened.pathname, "/restore/open");
+  assert.equal(opened.search, "");
+  const token = opened.hash.slice(1);
+  const preview = await handle({ method: "GET", path: `/api/consume?token=${token}` });
+  assert.equal(preview.status, 200);
+  assert.equal(preview.body.includes(token), false);
+  assert.equal(preview.headers["set-cookie"], undefined);
+  const consumed = await handle({
+    method: "POST",
+    path: "/api/restore/consume",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: `token=${token}`
+  });
   assert.equal(consumed.status, 303);
   const cookie = /dcp_session=([a-f0-9]{64})/.exec(consumed.headers["set-cookie"]);
   const restored = await handle({ method: "GET", path: "/api/status", headers: { cookie: `dcp_session=${cookie[1]}` } });
@@ -153,7 +166,12 @@ test("refund revokes the recorded purchase and a restore link is single-use", as
   assert.equal(restored.body.entitled, false);
   const otherStatus = await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${other.token}` } });
   assert.equal(otherStatus.body.state, "not-purchased");
-  const reused = await handle({ method: "GET", path: `/api/restore/consume?token=${token}` });
+  const reused = await handle({
+    method: "POST",
+    path: "/api/restore/consume",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: `token=${token}`
+  });
   assert.equal(reused.status, 400);
   assert.equal(reused.body.includes("이미 사용한 링크입니다"), true);
   const expired = await handler(runtime, {
@@ -162,7 +180,12 @@ test("refund revokes the recorded purchase and a restore link is single-use", as
     }
   });
   const issued = await runtime.issueLink({ accountId: buyer.accountId, email: "buyer@example.com", now: now - LOGIN_LINK_TTL_MS - 1000 });
-  const stale = await expired.handle({ method: "GET", path: `/api/restore/consume?token=${issued.token}` });
+  const stale = await expired.handle({
+    method: "POST",
+    path: "/api/restore/consume",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: `token=${issued.token}`
+  });
   assert.equal(stale.body.includes("만료된 링크입니다"), true);
   runtime.store.emails.set(buyer.accountId, "f".repeat(64));
   const mismatchLink = await runtime.issueLink({ accountId: buyer.accountId, email: "buyer@example.com", now });
@@ -282,6 +305,15 @@ test("the mail transport is SMTP and an API-key variable is not the password", a
   assert.equal(config.secure, true);
   assert.equal(config.passwordPresent, true);
   assert.deepEqual(Object.keys(config).sort(), ["fromPresent", "host", "passwordPresent", "port", "secure"]);
+  const message = loginMailContent("https://license.example/restore/open#0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+  assert.equal(message.subject.includes("구매 복원"), true);
+  assert.equal(message.subject.includes("Purchase restore"), true);
+  assert.equal(message.text.includes("15분 동안 한 번만"), true);
+  assert.equal(message.text.includes("expires after 15 minutes"), true);
+  assert.equal(message.text.includes("메일 보안 검사"), true);
+  assert.equal(message.text.includes("mail security check"), true);
+  assert.equal(message.text.includes("https://license.example/restore/open#"), true);
+  assert.equal(message.text.includes("http://"), false);
 });
 
 test("a failed mail send is not reported as sent and a mismatched link does not change accounts", async () => {
@@ -302,7 +334,12 @@ test("a failed mail send is not reported as sent and a mismatched link does not 
   assert.equal(failed.body.sent, false);
   const link = await runtime.issueLink({ accountId: buyer.accountId, email: "buyer@example.com", now });
   runtime.store.emails.set(buyer.accountId, "a".repeat(64));
-  const mismatch = await handle({ method: "GET", path: `/api/restore/consume?token=${link.token}` });
+  const mismatch = await handle({
+    method: "POST",
+    path: "/api/restore/consume",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: `token=${link.token}`
+  });
   assert.equal(mismatch.body.includes("다른 계정"), true);
   assert.equal(mismatch.headers?.["set-cookie"], undefined);
   const status = await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${buyer.token}` } });
@@ -328,9 +365,18 @@ test("a session without a purchase is not Pro, logout drops only that session, a
   runtime.store.accounts.get([...runtime.store.accounts.keys()].at(-1)).expiresAt = now - 1;
   const expired = await handle({ method: "GET", path: "/api/status", headers: { authorization: `Bearer ${next.token}` } });
   assert.equal(expired.status, 401);
-  const bad = await handle({ method: "GET", path: "/api/restore/consume?token=not-a-token" });
+  const badPreview = await handle({ method: "GET", path: "/api/restore/consume?token=not-a-token" });
+  assert.equal(badPreview.status, 200);
+  assert.equal(badPreview.body.includes("not-a-token"), false);
+  const bad = await handle({
+    method: "POST",
+    path: "/api/restore/consume",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: "token=not-a-token"
+  });
   assert.equal(bad.status, 400);
   assert.equal(bad.body.includes("확인할 수 없습니다"), true);
+  assert.equal(bad.body.includes("not-a-token"), false);
 });
 
 test("restore requests are limited and a live purchase stays separate from Sandbox", async () => {
@@ -399,7 +445,19 @@ test("a login link can be used once and then expires without sending mail", asyn
   await postWebhook(handle, payload(buyer.accountId, { transactionId: "txn_link", eventId: "evt_link" }));
   const issued = await runtime.issueLink({ accountId: buyer.accountId, email: "buyer@example.com", now });
   assert.equal(issued.ok, true);
-  const first = await handle({ method: "GET", path: `/api/consume?token=${issued.token}` });
+  const scanned = await handle({ method: "GET", path: `/api/consume?token=${issued.token}` });
+  const head = await handle({ method: "HEAD", path: "/restore/open" });
+  assert.equal(scanned.status, 200);
+  assert.equal(head.status, 200);
+  assert.equal(head.body, "");
+  assert.equal(scanned.body.includes(issued.token), false);
+  assert.equal(scanned.headers["set-cookie"], undefined);
+  const first = await handle({
+    method: "POST",
+    path: "/api/consume",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: `token=${issued.token}`
+  });
   assert.equal(first.status, 303);
   assert.equal(first.headers.location, "/restore/done");
   assert.equal(first.body.includes(issued.token), false);
@@ -408,7 +466,12 @@ test("a login link can be used once and then expires without sending mail", asyn
   assert.equal(restored.body.state, "sandbox");
   assert.equal(restored.body.entitled, false);
   assert.equal(restored.body.channel, "sandbox");
-  const reused = await handle({ method: "GET", path: `/api/consume?token=${issued.token}` });
+  const reused = await handle({
+    method: "POST",
+    path: "/api/consume",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: `token=${issued.token}`
+  });
   assert.equal(reused.status, 400);
   assert.equal(reused.body.includes("이미 사용한 링크입니다"), true);
   assert.equal(reused.body.includes(issued.token), false);
@@ -417,7 +480,12 @@ test("a login link can be used once and then expires without sending mail", asyn
     email: "buyer@example.com",
     now: now - LOGIN_LINK_TTL_MS - 1
   });
-  const stale = await handle({ method: "GET", path: `/api/consume?token=${staleLink.token}` });
+  const stale = await handle({
+    method: "POST",
+    path: "/api/consume",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: `token=${staleLink.token}`
+  });
   assert.equal(stale.status, 400);
   assert.equal(stale.body.includes("만료된 링크입니다"), true);
   assert.equal(stale.body.includes(staleLink.token), false);

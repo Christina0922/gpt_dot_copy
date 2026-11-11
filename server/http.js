@@ -21,7 +21,12 @@ export function createLicenseHandler({ runtime = { kind: "missing" }, env = {}, 
     if (method === "POST" && path === "/api/logout") return logout(runtime, headers);
     if (method === "POST" && path === "/api/webhook") return webhook(runtime, env, headers, body, now);
     if (method === "POST" && path === "/api/restore") return restore(runtime, env, headers, body, now, mailer);
-    if (method === "GET" && (path === "/api/restore/consume" || path === "/api/consume")) return consume(runtime, request?.path || "", now);
+    if ((method === "GET" || method === "HEAD") && (path === "/api/restore/consume" || path === "/api/consume" || path === "/restore/open")) {
+      return consumePreview(method);
+    }
+    if (method === "POST" && (path === "/api/restore/consume" || path === "/api/consume")) {
+      return consume(runtime, headers, body, now);
+    }
     if (path === "/api/client-success") return json(400, { granted: false });
     if (method === "GET" || method === "POST") return page(path, env);
     return json(405, { ok: false });
@@ -154,7 +159,7 @@ async function restore(runtime, env, headers, body, now, mailer) {
     if (!origin) return restoreResult(form, 503, { sent: false, reason: "mail-not-configured" });
     const mail = await mailer({
       to: email,
-      link: `${origin}/api/consume?token=${issued.token}`,
+      link: `${origin}/restore/open#${issued.token}`,
       env
     });
     if (!mail?.sent) return restoreResult(form, 503, { sent: false, reason: mail?.reason || "mail-failed" });
@@ -164,9 +169,23 @@ async function restore(runtime, env, headers, body, now, mailer) {
   }
 }
 
-async function consume(runtime, rawPath, now) {
+function consumePreview(method) {
+  const page = renderPage({ path: "/restore/open" });
+  return {
+    status: 200,
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      "referrer-policy": "no-referrer",
+      "x-robots-tag": "noindex"
+    },
+    body: method === "HEAD" ? "" : page
+  };
+}
+
+async function consume(runtime, headers, body, now) {
   if (!ready(runtime)) return html(503, renderPage({ path: "/failure" }));
-  const token = new URL(rawPath, "https://license.local").searchParams.get("token") || "";
+  const token = readToken(body, headers["content-type"] || "");
   try {
     const result = await runtime.consumeLink(token, now());
     if (!result.ok) return html(400, consumeFailure(result.reason));
@@ -175,7 +194,8 @@ async function consume(runtime, rawPath, now) {
       headers: {
         location: "/restore/done",
         "set-cookie": `dcp_session=${result.token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000`,
-        "cache-control": "no-store"
+        "cache-control": "no-store",
+        "referrer-policy": "no-referrer"
       },
       body: ""
     };
@@ -240,6 +260,16 @@ function consumeFailure(reason) {
     unknown: "링크를 확인할 수 없습니다."
   }[reason] || "링크를 확인할 수 없습니다.";
   return `<!doctype html><html lang="ko"><meta charset="utf-8"><title>구매 복원</title><p>${message}</p>`;
+}
+
+function readToken(body, contentType) {
+  if (contentType.includes("application/x-www-form-urlencoded")) return new URLSearchParams(body).get("token") || "";
+  try {
+    const parsed = JSON.parse(body || "");
+    return typeof parsed?.token === "string" ? parsed.token : "";
+  } catch {
+    return "";
+  }
 }
 
 function readEmail(body, contentType) {

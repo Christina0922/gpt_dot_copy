@@ -72,13 +72,21 @@ try {
 }
 
 async function consume(token) {
-  const response = await fetch(`https://dot-copy-paste.vercel.app/api/consume?token=${token}`, { redirect: "manual" });
+  const preview = await fetch("https://dot-copy-paste.vercel.app/restore/open", { method: "GET" });
+  const previewText = await preview.text();
+  const response = await fetch("https://dot-copy-paste.vercel.app/api/consume", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ token }),
+    redirect: "manual"
+  });
   const text = await response.text();
   return {
     status: response.status,
     cookie: response.headers.get("set-cookie") || "",
     used: text.includes("이미 사용한 링크입니다"),
     expired: text.includes("만료된 링크입니다"),
-    echo: text.includes(token)
+    echo: previewText.includes(token) || text.includes(token),
+    preview: preview.status
   };
 }
