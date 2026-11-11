@@ -17,7 +17,16 @@ const env = {
 };
 
 function handler(runtime = createMemoryRuntime(), options = {}) {
-  return { runtime, handle: createLicenseHandler({ runtime, env, now: () => now, mailer: options.mailer }) };
+  return {
+    runtime,
+    handle: createLicenseHandler({
+      runtime,
+      env: options.env || env,
+      now: () => now,
+      mailer: options.mailer,
+      fetchImpl: options.fetchImpl
+    })
+  };
 }
 
 function payload(accountId, overrides = {}) {
@@ -524,4 +533,39 @@ test("sandbox verify export is available only in the sandbox test environment", 
   const liveHealth = await mixed({ method: "GET", path: "/api/health" });
   assert.equal(liveHealth.body.sandboxExport, "off");
   assert.equal(liveHealth.body.sale, "preparing");
+});
+
+test("a sandbox notice without an inline email uses the Paddle customer email", async () => {
+  const calls = [];
+  const { handle } = handler(createMemoryRuntime(), {
+    env: { ...env, DCP_PADDLE_API_KEY: "pdl_sdbx_test" },
+    async mailer() {
+      return { sent: true };
+    },
+    async fetchImpl(url) {
+      calls.push(url);
+      return { ok: true, json: async () => ({ data: { email: "buyer@example.com" } }) };
+    }
+  });
+  const buyer = (await handle({ method: "POST", path: "/api/session" })).body;
+  const body = payload(buyer.accountId, { eventId: "evt_customer", transactionId: "txn_customer" });
+  body.data.customer = {};
+  body.data.customer_id = "ctm_buyer";
+  const granted = await postWebhook(handle, body);
+  assert.equal(granted.body.granted, true);
+  assert.deepEqual(calls, ["https://sandbox-api.paddle.com/customers/ctm_buyer"]);
+  const restore = await handle({
+    method: "POST",
+    path: "/api/restore",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "buyer@example.com" })
+  });
+  assert.equal(restore.body.sent, true);
+  const other = await handle({
+    method: "POST",
+    path: "/api/restore",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "other@example.com" })
+  });
+  assert.equal(other.body.reason, "not-purchased");
 });

@@ -1,4 +1,5 @@
 import { mailReady, sendLoginMail } from "./mail.js";
+import { readCustomerEmail } from "./paddle-customer.js";
 import { renderPage } from "./pages.js";
 import { interpretNotification } from "./purchase.js";
 import { sandboxVerifyEnabled, withSandboxVerify } from "./sandbox-export.js";
@@ -7,7 +8,7 @@ import { verifySignature } from "./signature.js";
 const CATALOG_PRODUCT_ID = "dot-copy-paste-export";
 const MAX_BODY = 100_000;
 
-export function createLicenseHandler({ runtime = { kind: "missing" }, env = {}, now = () => Date.now(), mailer = sendLoginMail } = {}) {
+export function createLicenseHandler({ runtime = { kind: "missing" }, env = {}, now = () => Date.now(), mailer = sendLoginMail, fetchImpl = fetch } = {}) {
   return async function handle(request) {
     const method = request?.method || "GET";
     const path = routePath(request?.path || "/").split("?")[0];
@@ -19,7 +20,7 @@ export function createLicenseHandler({ runtime = { kind: "missing" }, env = {}, 
     if (method === "POST" && path === "/api/session") return createSession(runtime, now);
     if (method === "GET" && path === "/api/status") return readStatus(runtime, env, headers, now);
     if (method === "POST" && path === "/api/logout") return logout(runtime, headers);
-    if (method === "POST" && path === "/api/webhook") return webhook(runtime, env, headers, body, now);
+    if (method === "POST" && path === "/api/webhook") return webhook(runtime, env, headers, body, now, fetchImpl);
     if (method === "POST" && path === "/api/restore") return restore(runtime, env, headers, body, now, mailer);
     if ((method === "GET" || method === "HEAD") && (path === "/api/restore/consume" || path === "/api/consume" || path === "/restore/open")) {
       return consumePreview(method);
@@ -120,7 +121,7 @@ async function logout(runtime, headers) {
   };
 }
 
-async function webhook(runtime, env, headers, body, now) {
+async function webhook(runtime, env, headers, body, now, fetchImpl) {
   if (!ready(runtime)) return json(503, { granted: false, state: "unavailable" });
   const header = headers["paddle-signature"] || "";
   if (!verifySignature(body, header, env.DCP_PADDLE_WEBHOOK_SECRET, now())) return json(401, { granted: false });
@@ -137,7 +138,9 @@ async function webhook(runtime, env, headers, body, now) {
       if (!channel) decision.action = "ignore";
       else decision.environment = channel;
     }
-    const result = await runtime.applyNotification(decision, notification?.data?.customer?.email || "");
+    const inlineEmail = notification?.data?.customer?.email || "";
+    const email = inlineEmail || await readCustomerEmail(env, notification?.data?.customer_id, fetchImpl);
+    const result = await runtime.applyNotification(decision, email);
     return json(200, { granted: result.granted === true, duplicate: result.duplicate === true });
   } catch {
     return json(503, { granted: false, state: "unavailable" });
