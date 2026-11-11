@@ -97,6 +97,8 @@ export const liveAdapter = {
     if (!message) return "unknown";
     return sideFromActions(messageActions(message));
   },
+  // No confirmed signal separates a generating dot reply from a finished one.
+  // User text is complete. Every other message stays unknown, so copy is not described as finished.
   getGenerationState(message) {
     if (!message) return "unknown";
     return authorKind(message) === "user" ? "complete" : "unknown";

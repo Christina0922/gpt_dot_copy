@@ -1,14 +1,14 @@
 # Privacy Policy — Dot Copy Paste
 
-Last updated: October 23, 2026
+Last updated: October 29, 2026
 
-Dot Copy Paste is an independent Chrome extension. It is not an official OpenAI product and is not affiliated with, endorsed by, or sponsored by OpenAI. It adds clipboard controls to supported ChatGPT dot conversation pages.
+Dot Copy Paste is an independent Chrome extension. It is not an official OpenAI product and is not affiliated with, endorsed by, or sponsored by OpenAI. It adds copy controls to supported ChatGPT dot conversation pages.
 
-The archived Word file `Dot_Copy_Paste_Privacy_Policy.docx` is dated October 19, 2026. This page adds the Markdown copy behavior introduced in version 0.2.1. It does not add a new recipient, permission, or stored data type.
+The current policy is this file. `archive/Dot_Copy_Paste_Privacy_Policy_2026-10-19.docx` is an old snapshot from October 19, 2026. It describes an earlier paste design and is not the policy for the current extension.
 
 ## Information the extension handles
 
-The extension reads the page structure needed to recognize a ChatGPT dot conversation. When you click Copy, it reads that message body and writes plain text to the clipboard. When you open the Markdown item and click it, it reads the same body and writes Markdown instead. When you click Paste and clipboard reading is available, it reads plain text from the clipboard and tries to insert it into the composer.
+The extension reads the page structure needed to recognize a ChatGPT dot conversation. When you click Copy, it reads that message body and writes plain text to the clipboard. When you open the Markdown item and click it, it reads the same body and writes Markdown instead. The paste button does not read the clipboard and does not change the composer. Use Ctrl+V in the input. The extension does not request clipboard-reading permission.
 
 Conversation messages and clipboard text may contain personal communications. The extension uses that text only to perform the click you made.
 
@@ -24,7 +24,7 @@ Site access to `https://chatgpt.com/*` lets the extension find a dot conversatio
 
 `storage` keeps the local settings above.
 
-`clipboardRead` stays optional. It is used only after you click Paste. The extension does not watch the clipboard in the background. You can refuse or revoke this permission and still use Copy.
+The extension does not declare `clipboardRead`. It does not watch the clipboard, and the paste button does not read it. Copy runs from the button click and does not need that permission.
 
 ## Your choices
 
@@ -32,7 +32,7 @@ The extension does not send messages. You decide whether to edit or send text in
 
 You can disable or remove the extension in Chrome, and you can change its site access and optional permissions there. Text that was copied remains in the system clipboard according to the operating system and other applications. This policy does not control that clipboard history.
 
-If Paste cannot make the dot composer accept the text as a draft, the extension restores the previous composer text and tells you to use Ctrl+V. It does not report that paste as successful.
+The paste button does not insert text into the dot composer, so it does not replace an existing draft. It tells you to use Ctrl+V. Selection restore and undo are not provided by that button.
 
 ## Sharing
 

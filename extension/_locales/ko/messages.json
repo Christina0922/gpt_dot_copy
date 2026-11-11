@@ -3,6 +3,6 @@
     "message": "Dot Copy Paste"
   },
   "extDescription": {
-    "message": "ChatGPT 닷 메시지를 텍스트나 마크다운으로 복사합니다. 붙여넣기가 실패하면 Ctrl+V를 사용하세요."
+    "message": "ChatGPT 닷 메시지를 텍스트나 마크다운으로 복사합니다. 붙여넣기는 Ctrl+V를 사용하세요."
   }
 }

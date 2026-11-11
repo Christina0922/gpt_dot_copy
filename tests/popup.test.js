@@ -49,22 +49,17 @@ function fakeChrome() {
   };
 }
 
-test("popup does not request clipboard permission or read text until the button click", async () => {
+test("popup has no clipboard permission menu and does not request clipboardRead", async () => {
   const doc = popupDom();
   const chrome = fakeChrome();
-  let reads = 0;
-  const popup = wirePopup(doc, { chrome, version: "0.2.0" });
+  const popup = wirePopup(doc, { chrome, version: "0.2.3" });
   await popup.init();
+  assert.equal(doc.querySelector("[data-action='allow-clipboard']"), null);
+  assert.equal(doc.querySelector("[data-action='revoke-clipboard']"), null);
+  assert.equal(doc.querySelector("[data-i18n='clipboardExplain']"), null);
   assert.equal(chrome.calls.includes("request"), false);
-  assert.equal(reads, 0);
+  assert.equal(chrome.calls.includes("remove"), false);
   assert.equal(doc.querySelector("[data-i18n='domUnverified']").textContent, "Copy and paste buttons appear only on a ChatGPT dot conversation page.");
-  assert.equal(doc.querySelector("[data-role='version']").textContent, "0.2.0");
-  doc.querySelector("[data-action='allow-clipboard']").click();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.equal(chrome.calls.filter((call) => call === "request").length, 1);
-  assert.equal(reads, 0);
-  doc.querySelector("[data-action='revoke-clipboard']").click();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.equal(chrome.calls.at(-1), "remove");
+  assert.equal(doc.querySelector("[data-role='version']").textContent, "0.2.3");
   assert.equal(chrome.storageState.settings.enabled, true);
 });

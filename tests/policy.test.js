@@ -9,9 +9,10 @@ const root = new URL("../extension/", import.meta.url);
 test("manifest is MV3 and limited to chatgpt.com", () => {
   const manifest = JSON.parse(readFileSync(new URL("manifest.json", root), "utf8"));
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, "0.2.1");
+  assert.equal(manifest.version, "0.2.3");
   assert.deepEqual(manifest.permissions, ["storage"]);
-  assert.deepEqual(manifest.optional_permissions, ["clipboardRead"]);
+  assert.equal(manifest.optional_permissions, undefined);
+  assert.equal(JSON.stringify(manifest).includes("clipboardRead"), false);
   assert.equal(manifest.host_permissions, undefined);
   assert.deepEqual(manifest.content_scripts[0].matches, ["https://chatgpt.com/*"]);
   assert.deepEqual(manifest.content_scripts[0].js, ["content/content.js"]);

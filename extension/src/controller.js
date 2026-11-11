@@ -1,6 +1,6 @@
 import { extractPlainText, hasCopyableText } from "./extract-text.js";
 import { extractMarkdown } from "./extract-markdown.js";
-import { insertPlainText, isEditorEmpty, readContentEditableCaret, readTextareaCaret } from "./insert-text.js";
+import { expectedTextareaValue, insertPlainText, isEditorEmpty, readContentEditableCaret, readTextareaCaret } from "./insert-text.js";
 import { readPlainText, writePlainText } from "./clipboard.js";
 import { computeAnchorPosition, findCopyAnchor } from "./position.js";
 import { createTranslator } from "./i18n.js";
@@ -377,6 +377,10 @@ export function createController({
       setStatus(status, t("composerMissing"), "error");
       return;
     }
+    if (composer.kind !== "textarea") {
+      showPasteUnavailable(status);
+      return;
+    }
     const reading = await readPlainText(clipboard, doc);
     if (!reading.ok) {
       const key = reading.reason === "empty" ? "clipboardEmpty" : "clipboardDenied";
@@ -384,44 +388,26 @@ export function createController({
       return;
     }
     const current = adapter.getComposer(doc);
-    if (!current || current.element !== composer.element || !current.element.isConnected) {
+    if (!current || current.kind !== "textarea" || current.element !== composer.element || !current.element.isConnected) {
       setStatus(status, t("composerMissing"), "error");
       return;
     }
     const caret = isEditorEmpty(current) ? null : savedCaret;
-    const beforeDraft = typeof adapter.composerHasDraft === "function" ? adapter.composerHasDraft(current.element) : null;
-    const beforeValue = current.kind === "textarea" ? current.element.value : current.element.textContent || "";
+    const beforeValue = current.element.value;
     const inserted = insertPlainText(current, reading.text, caret, doc);
-    if (!inserted.ok) {
+    const expected = expectedTextareaValue(beforeValue, reading.text, caret);
+    if (!inserted.ok || current.element.value !== expected) {
       restoreComposer(current, beforeValue, caret);
-      setStatus(status, t(inserted.reason === "cancelled" ? "insertRejected" : "composerMissing"), "error");
+      setStatus(status, t(inserted.reason === "cancelled" || inserted.ok ? "insertRejected" : "composerMissing"), "error");
       return;
-    }
-    if (current.kind === "contenteditable" || beforeDraft === false) {
-      await nextFrame();
-      const draft = current.element.isConnected && typeof adapter.composerHasDraft === "function"
-        ? adapter.composerHasDraft(current.element)
-        : null;
-      const after = current.kind === "textarea" ? current.element.value : (current.element.textContent || "");
-      const stayed = after !== beforeValue;
-      const accepted = current.kind === "textarea"
-        ? stayed && (beforeDraft !== false || draft !== false)
-        : stayed && (beforeDraft !== false || draft === true);
-      if (!accepted) {
-        restoreComposer(current, beforeValue, caret);
-        setStatus(status, t("insertRejected"), "error");
-        return;
-      }
     }
     setStatus(status, t("pasted"), "success");
   }
 
-  function nextFrame() {
-    return new Promise((resolve) => {
-      const host = doc.defaultView;
-      if (typeof host?.requestAnimationFrame === "function") host.requestAnimationFrame(() => resolve());
-      else resolve();
-    });
+  function showPasteUnavailable(status) {
+    status.textContent = t("pasteUnavailable");
+    status.dataset.dcpState = "error";
+    if (status._timer) view.clearTimeout(status._timer);
   }
 
   function restoreComposer(current, beforeValue, caret) {
@@ -479,8 +465,13 @@ export function createController({
       });
       pasteUi = { wrap, button, status };
     }
+    const confirmed = composer.kind === "textarea";
+    pasteUi.button.disabled = !confirmed;
     pasteUi.button.textContent = t("paste");
-    pasteUi.button.setAttribute("aria-label", t("paste"));
+    const label = confirmed ? t("paste") : t("pasteUnavailable");
+    pasteUi.button.setAttribute("aria-label", label);
+    pasteUi.button.title = label;
+    if (!confirmed) showPasteUnavailable(pasteUi.status);
   }
 
   // A failure on one node skips only that node; see reportFailure for when observing stops.

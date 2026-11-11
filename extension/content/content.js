@@ -54,20 +54,14 @@ const MESSAGES = {
     clipboardDenied: "The clipboard could not be read. Use Ctrl+V in the input field.",
     clipboardEmpty: "The clipboard has no text.",
     composerMissing: "The input field was not found. Nothing was changed.",
-    insertRejected: "The input field did not accept the paste. Nothing was changed.",
+    insertRejected: "The input field did not accept the paste. Nothing was changed. Use Ctrl+V in the input field. This button does not guarantee selection restore or undo.",
+    pasteUnavailable: "This button is off because the dot input cannot confirm a draft. Click the input and press Ctrl+V. Selection restore and undo are not guaranteed. Nothing was changed.",
     popupTitle: "Dot Copy Paste",
     popupIntro: "Turns copy and paste buttons on or off and shows the version.",
     enabledLabel: "Use copy and paste buttons",
     languageLabel: "Language",
     languageKo: "Korean",
     languageEn: "English",
-    clipboardHeading: "Clipboard reading",
-    clipboardExplain: "Plain text is read only when you click Paste. Allowing this permission lets that click read the clipboard without an extra browser prompt. Copy keeps working if you decline. If reading fails, use Ctrl+V in the input field.",
-    allowClipboard: "Allow clipboard reading",
-    revokeClipboard: "Remove clipboard permission",
-    clipboardAllowed: "Clipboard reading is allowed.",
-    clipboardNotAllowed: "Clipboard reading is not allowed.",
-    clipboardRequestFailed: "The permission request did not finish. Copy still works, and you can use Ctrl+V in the input field.",
     unofficial: "Independently developed extension. Not an official OpenAI product.",
     versionLabel: "Version",
     domUnverified: "Copy and paste buttons appear only on a ChatGPT dot conversation page.",
@@ -88,20 +82,14 @@ const MESSAGES = {
     clipboardDenied: "클립보드를 읽을 수 없습니다. 입력창에서 Ctrl+V를 사용해 주세요.",
     clipboardEmpty: "클립보드에 텍스트가 없습니다.",
     composerMissing: "입력창을 찾지 못했습니다. 입력한 내용은 바꾸지 않았습니다.",
-    insertRejected: "입력창이 붙여넣기를 받아들이지 않았습니다. 입력한 내용은 바꾸지 않았습니다.",
+    insertRejected: "입력창이 붙여넣기를 받아들이지 않았습니다. 입력한 내용은 바꾸지 않았습니다. 입력창에서 Ctrl+V를 사용해 주세요. 이 버튼은 선택 영역 복원과 실행 취소를 보장하지 않습니다.",
+    pasteUnavailable: "닷 입력창의 초안 반영을 확인할 수 없어 이 버튼은 사용하지 않습니다. 입력창을 누른 뒤 Ctrl+V를 사용해 주세요. 선택 영역 복원과 실행 취소는 보장하지 않습니다. 입력한 내용은 바꾸지 않았습니다.",
     popupTitle: "Dot Copy Paste",
     popupIntro: "복사·붙여넣기 버튼을 켜거나 끄고, 버전을 확인합니다.",
     enabledLabel: "복사·붙여넣기 버튼 사용",
     languageLabel: "언어",
     languageKo: "한국어",
     languageEn: "영어",
-    clipboardHeading: "클립보드 읽기",
-    clipboardExplain: "일반 텍스트는 붙여넣기 버튼을 눌렀을 때만 읽습니다. 이 권한을 허용하면 그 클릭에서 추가 확인 없이 클립보드를 읽을 수 있습니다. 권한을 거절해도 복사는 계속 사용할 수 있습니다. 읽기에 실패하면 입력창에서 Ctrl+V를 사용해 주세요.",
-    allowClipboard: "클립보드 읽기 허용",
-    revokeClipboard: "클립보드 권한 철회",
-    clipboardAllowed: "클립보드 읽기가 허용되어 있습니다.",
-    clipboardNotAllowed: "클립보드 읽기가 허용되어 있지 않습니다.",
-    clipboardRequestFailed: "권한 요청이 끝나지 않았습니다. 복사는 계속 사용할 수 있고, 입력창에서 Ctrl+V를 사용할 수 있습니다.",
     unofficial: "독립적으로 개발된 확장프로그램입니다. OpenAI의 공식 제품이 아닙니다.",
     versionLabel: "버전",
     domUnverified: "복사·붙여넣기 버튼은 ChatGPT 닷 대화 화면에만 나타납니다.",
@@ -611,7 +599,7 @@ function extractMarkdown(root) {
 return { MARKDOWN_FORMAT, extractMarkdown };
 })();
 
-const { isEditorEmpty, readTextareaCaret, readContentEditableCaret, insertPlainText } = (() => {
+const { isEditorEmpty, readTextareaCaret, readContentEditableCaret, expectedTextareaValue, insertPlainText } = (() => {
 function insideEditor(editor, node) {
   return node === editor || editor.contains(node);
 }
@@ -820,6 +808,12 @@ function insertContentEditable(element, text, caret, doc) {
   return { ok: true, method: "execCommand", undo: "browser-default" };
 }
 
+function expectedTextareaValue(value, text, caret) {
+  const empty = value.length === 0;
+  const [start, end] = empty ? [0, 0] : textareaBounds(value, caret);
+  return value.slice(0, start) + text + value.slice(end);
+}
+
 function insertPlainText(composer, text, caret, doc) {
   if (!composer?.element || !composer.element.isConnected) return { ok: false, reason: "missing" };
   if (composer.kind === "textarea") return insertTextarea(composer.element, text, caret, doc);
@@ -827,7 +821,7 @@ function insertPlainText(composer, text, caret, doc) {
   return { ok: false, reason: "unsupported" };
 }
 
-return { isEditorEmpty, readTextareaCaret, readContentEditableCaret, insertPlainText };
+return { isEditorEmpty, readTextareaCaret, readContentEditableCaret, expectedTextareaValue, insertPlainText };
 })();
 
 const { legacyCopy, writePlainText, readPlainText } = (() => {
@@ -1060,6 +1054,8 @@ const liveAdapter = {
     if (!message) return "unknown";
     return sideFromActions(messageActions(message));
   },
+  // No confirmed signal separates a generating dot reply from a finished one.
+  // User text is complete. Every other message stays unknown, so copy is not described as finished.
   getGenerationState(message) {
     if (!message) return "unknown";
     return authorKind(message) === "user" ? "complete" : "unknown";
@@ -1457,6 +1453,10 @@ function createController({
       setStatus(status, t("composerMissing"), "error");
       return;
     }
+    if (composer.kind !== "textarea") {
+      showPasteUnavailable(status);
+      return;
+    }
     const reading = await readPlainText(clipboard, doc);
     if (!reading.ok) {
       const key = reading.reason === "empty" ? "clipboardEmpty" : "clipboardDenied";
@@ -1464,44 +1464,26 @@ function createController({
       return;
     }
     const current = adapter.getComposer(doc);
-    if (!current || current.element !== composer.element || !current.element.isConnected) {
+    if (!current || current.kind !== "textarea" || current.element !== composer.element || !current.element.isConnected) {
       setStatus(status, t("composerMissing"), "error");
       return;
     }
     const caret = isEditorEmpty(current) ? null : savedCaret;
-    const beforeDraft = typeof adapter.composerHasDraft === "function" ? adapter.composerHasDraft(current.element) : null;
-    const beforeValue = current.kind === "textarea" ? current.element.value : current.element.textContent || "";
+    const beforeValue = current.element.value;
     const inserted = insertPlainText(current, reading.text, caret, doc);
-    if (!inserted.ok) {
+    const expected = expectedTextareaValue(beforeValue, reading.text, caret);
+    if (!inserted.ok || current.element.value !== expected) {
       restoreComposer(current, beforeValue, caret);
-      setStatus(status, t(inserted.reason === "cancelled" ? "insertRejected" : "composerMissing"), "error");
+      setStatus(status, t(inserted.reason === "cancelled" || inserted.ok ? "insertRejected" : "composerMissing"), "error");
       return;
-    }
-    if (current.kind === "contenteditable" || beforeDraft === false) {
-      await nextFrame();
-      const draft = current.element.isConnected && typeof adapter.composerHasDraft === "function"
-        ? adapter.composerHasDraft(current.element)
-        : null;
-      const after = current.kind === "textarea" ? current.element.value : (current.element.textContent || "");
-      const stayed = after !== beforeValue;
-      const accepted = current.kind === "textarea"
-        ? stayed && (beforeDraft !== false || draft !== false)
-        : stayed && (beforeDraft !== false || draft === true);
-      if (!accepted) {
-        restoreComposer(current, beforeValue, caret);
-        setStatus(status, t("insertRejected"), "error");
-        return;
-      }
     }
     setStatus(status, t("pasted"), "success");
   }
 
-  function nextFrame() {
-    return new Promise((resolve) => {
-      const host = doc.defaultView;
-      if (typeof host?.requestAnimationFrame === "function") host.requestAnimationFrame(() => resolve());
-      else resolve();
-    });
+  function showPasteUnavailable(status) {
+    status.textContent = t("pasteUnavailable");
+    status.dataset.dcpState = "error";
+    if (status._timer) view.clearTimeout(status._timer);
   }
 
   function restoreComposer(current, beforeValue, caret) {
@@ -1559,8 +1541,13 @@ function createController({
       });
       pasteUi = { wrap, button, status };
     }
+    const confirmed = composer.kind === "textarea";
+    pasteUi.button.disabled = !confirmed;
     pasteUi.button.textContent = t("paste");
-    pasteUi.button.setAttribute("aria-label", t("paste"));
+    const label = confirmed ? t("paste") : t("pasteUnavailable");
+    pasteUi.button.setAttribute("aria-label", label);
+    pasteUi.button.title = label;
+    if (!confirmed) showPasteUnavailable(pasteUi.status);
   }
 
   // A failure on one node skips only that node; see reportFailure for when observing stops.
@@ -1903,7 +1890,7 @@ startApp({
   chrome,
   window,
   document,
-  build: "1cbb8b755f56"
+  build: "725d4aa0afd9"
 }).catch((error) => {
   const name = error && typeof error.name === "string" ? error.name : "Error";
   console.error("[Dot Copy Paste]", name);

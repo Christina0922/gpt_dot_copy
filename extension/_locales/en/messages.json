@@ -3,6 +3,6 @@
     "message": "Dot Copy Paste"
   },
   "extDescription": {
-    "message": "Copy ChatGPT dot messages as text or Markdown. Paste may fail; use Ctrl+V in the composer."
+    "message": "Copy ChatGPT dot messages as text or Markdown. Paste uses Ctrl+V; the button does not edit the composer."
   }
 }

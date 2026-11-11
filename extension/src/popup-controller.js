@@ -3,17 +3,11 @@ import { loadSettings, normalizeSettings, saveSettings } from "./settings.js";
 
 export function wirePopup(doc, { chrome, version }) {
   const storage = chrome.storage.local;
-  const permissions = chrome.permissions;
   const nodes = {
     title: doc.querySelector("[data-i18n='popupTitle']"),
     intro: doc.querySelector("[data-i18n='popupIntro']"),
     enabledLabel: doc.querySelector("[data-i18n='enabledLabel']"),
     languageLabel: doc.querySelector("[data-i18n='languageLabel']"),
-    clipboardHeading: doc.querySelector("[data-i18n='clipboardHeading']"),
-    clipboardExplain: doc.querySelector("[data-i18n='clipboardExplain']"),
-    allow: doc.querySelector("[data-action='allow-clipboard']"),
-    revoke: doc.querySelector("[data-action='revoke-clipboard']"),
-    permissionStatus: doc.querySelector("[data-role='permission-status']"),
     unofficial: doc.querySelector("[data-i18n='unofficial']"),
     trademark: doc.querySelector("[data-i18n='trademark']"),
     domUnverified: doc.querySelector("[data-i18n='domUnverified']"),
@@ -37,29 +31,16 @@ export function wirePopup(doc, { chrome, version }) {
   function paint() {
     language = resolveLanguage(settings.language, uiLanguage());
     doc.documentElement.lang = language === "ko" ? "ko" : "en";
-    for (const [key, node] of Object.entries(nodes)) {
+    for (const node of Object.values(nodes)) {
       if (!node || !node.dataset || !node.dataset.i18n) continue;
       node.textContent = t(node.dataset.i18n);
     }
-    nodes.allow.textContent = t("allowClipboard");
-    nodes.revoke.textContent = t("revokeClipboard");
     nodes.version.textContent = version;
     nodes.enabled.checked = settings.enabled;
     nodes.language.value = language;
     for (const option of nodes.language.options) {
       if (option.value === "ko") option.textContent = t("languageKo");
       if (option.value === "en") option.textContent = t("languageEn");
-    }
-  }
-
-  async function paintPermission() {
-    try {
-      const allowed = await permissions.contains({ permissions: ["clipboardRead"] });
-      nodes.permissionStatus.textContent = t(allowed ? "clipboardAllowed" : "clipboardNotAllowed");
-      nodes.permissionStatus.dataset.dcpState = allowed ? "success" : "info";
-    } catch {
-      nodes.permissionStatus.textContent = t("clipboardNotAllowed");
-      nodes.permissionStatus.dataset.dcpState = "error";
     }
   }
 
@@ -71,40 +52,12 @@ export function wirePopup(doc, { chrome, version }) {
   nodes.language.addEventListener("change", async () => {
     settings = await saveSettings(storage, { ...settings, language: nodes.language.value, languageChosen: true });
     paint();
-    await paintPermission();
-  });
-
-  nodes.allow.addEventListener("click", async () => {
-    try {
-      const granted = await permissions.request({ permissions: ["clipboardRead"] });
-      nodes.permissionStatus.textContent = t(granted ? "clipboardAllowed" : "clipboardNotAllowed");
-      nodes.permissionStatus.dataset.dcpState = granted ? "success" : "info";
-    } catch {
-      nodes.permissionStatus.textContent = t("clipboardRequestFailed");
-      nodes.permissionStatus.dataset.dcpState = "error";
-    }
-  });
-
-  nodes.revoke.addEventListener("click", async () => {
-    try {
-      await permissions.remove({ permissions: ["clipboardRead"] });
-    } catch {
-      nodes.permissionStatus.textContent = t("clipboardRequestFailed");
-      nodes.permissionStatus.dataset.dcpState = "error";
-      return;
-    }
-    await paintPermission();
-  });
-
-  permissions.onRemoved.addListener(() => {
-    paintPermission();
   });
 
   return {
     async init() {
       settings = await loadSettings(storage);
       paint();
-      await paintPermission();
     }
   };
 }

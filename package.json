@@ -1,9 +1,9 @@
 {
   "name": "dot-copy-paste",
-  "version": "0.2.1",
+  "version": "0.2.3",
   "private": true,
   "type": "module",
-  "description": "Independent Chrome extension that copies ChatGPT dot messages as text or Markdown. Paste into the dot composer is experimental.",
+  "description": "Independent Chrome extension that copies ChatGPT dot messages as text or Markdown. The paste button does not edit the dot composer.",
   "scripts": {
     "test": "node --test",
     "icons": "node scripts/make-icons.mjs",

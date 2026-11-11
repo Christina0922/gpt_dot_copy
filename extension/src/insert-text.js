@@ -206,6 +206,12 @@ function insertContentEditable(element, text, caret, doc) {
   return { ok: true, method: "execCommand", undo: "browser-default" };
 }
 
+export function expectedTextareaValue(value, text, caret) {
+  const empty = value.length === 0;
+  const [start, end] = empty ? [0, 0] : textareaBounds(value, caret);
+  return value.slice(0, start) + text + value.slice(end);
+}
+
 export function insertPlainText(composer, text, caret, doc) {
   if (!composer?.element || !composer.element.isConnected) return { ok: false, reason: "missing" };
   if (composer.kind === "textarea") return insertTextarea(composer.element, text, caret, doc);

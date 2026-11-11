@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.3
+
+- Removed `clipboardRead` and the popup allow/revoke controls. The dot paste button does not read the clipboard, and no other product feature does.
+- The October 19, 2026 Word privacy policy is archived and is not the current policy.
+
+## 0.2.2
+
+- The dot composer is contenteditable. Visible text and an already enabled Send button do not prove that a programmatic paste became a draft. The paste button no longer reads the clipboard or changes that composer.
+- The button is disabled and tells you to click the input and press Ctrl+V. It also says selection restore and undo are not guaranteed.
+- A multiline draft is left as it is. The button does not replace the composer DOM.
+- A textarea composer, which is not the dot input, still pastes only when the value equals the expected edit. Any other result is restored and shown as failure, with the same Ctrl+V guidance.
+- The live adapter still cannot tell a generating dot reply from a finished one. Dot replies stay on "Copy visible text". Blocking copy while a reply is generating is covered by fixture tests only.
+
 ## 0.2.1
 
 - The popup language now follows the browser language until a language is chosen. Korean browser languages use Korean. Every other language uses English. An explicit Korean or English choice overrides the browser.

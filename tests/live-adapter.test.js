@@ -63,7 +63,7 @@ test("confirmed Dot landmarks activate copy buttons and leave image-only message
   assert.equal(added.lastElementChild, doc.querySelector("[data-message-id='u1'] .dcp-copy-slot"));
 });
 
-test("an empty Dot composer that stays unaccepted is restored", async () => {
+test("the dot paste button does not read the clipboard or change an empty composer", async () => {
   const dom = loadDom(dotHtml, "https://chatgpt.com/dots/home");
   const doc = dom.window.document;
   doc.hasFocus = () => true;
@@ -78,40 +78,44 @@ test("an empty Dot composer that stays unaccepted is restored", async () => {
   controller.start();
   const editor = doc.querySelector("[contenteditable='true']");
   const send = doc.querySelector("button[aria-label='Send']");
-  send.disabled = true;
-  doc.querySelector("[data-dcp-paste]").click();
+  const paste = doc.querySelector("[data-dcp-paste]");
+  send.disabled = false;
+  send.setAttribute("aria-disabled", "false");
+  paste.click();
   await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(paste.disabled, true);
   assert.equal((editor.textContent || "").trim(), "");
-  assert.equal(doc.querySelector("[data-dcp-paste]").parentElement.querySelector(".dcp-status").textContent, "입력창이 붙여넣기를 받아들이지 않았습니다. 입력한 내용은 바꾸지 않았습니다.");
-  assert.equal(send.disabled, true);
+  assert.equal(clipboard.calls.some((call) => call[0] === "read"), false);
+  assert.match(paste.parentElement.querySelector(".dcp-status").textContent, /Ctrl\+V/);
+  assert.equal(paste.parentElement.querySelector(".dcp-status").textContent.includes("붙여넣음"), false);
 });
 
-test("an empty Dot composer that enables Send keeps the pasted text", async () => {
+test("an existing multiline dot draft is left unchanged when Send is already enabled", async () => {
   const dom = loadDom(dotHtml, "https://chatgpt.com/dots/home");
   const doc = dom.window.document;
-  doc.hasFocus = () => true;
+  const clipboard = createClipboard({ text: "DCP-CHECK" });
   const controller = createController({
     adapter: liveAdapter,
     document: doc,
     window: dom.window,
-    clipboard: createClipboard({ text: "DCP-CHECK" }),
+    clipboard,
     getLanguage: () => "ko"
   });
   controller.start();
   const editor = doc.querySelector("[contenteditable='true']");
+  const first = doc.createElement("p");
+  first.textContent = "첫째 문단";
+  const second = doc.createElement("p");
+  second.textContent = "둘째\n줄";
+  editor.append(first, second);
+  const before = editor.innerHTML;
   const send = doc.querySelector("button[aria-label='Send']");
-  send.disabled = true;
-  editor.addEventListener("beforeinput", () => {
-    send.disabled = false;
-  });
-  editor.addEventListener("input", () => {
-    send.disabled = false;
-  });
+  send.disabled = false;
   doc.querySelector("[data-dcp-paste]").click();
   await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.equal(editor.textContent, "DCP-CHECK");
-  assert.equal(send.disabled, false);
-  assert.equal(doc.querySelector(".dcp-anchor .dcp-status").textContent, "붙여넣음");
+  assert.equal(editor.innerHTML, before);
+  assert.equal(clipboard.calls.some((call) => call[0] === "read"), false);
+  assert.equal(doc.querySelector(".dcp-anchor .dcp-status").textContent.includes("붙여넣음"), false);
 });
 
 test("a normal ChatGPT path does not receive Dot buttons", () => {
