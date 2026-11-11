@@ -116,5 +116,16 @@ export const liveAdapter = {
     const send = findSendButton(element?.closest?.("[data-role='composer']"));
     if (!send) return null;
     return send.disabled !== true && send.getAttribute("aria-disabled") !== "true";
+  },
+  // The signed-in dot page did not show a total message count or a completed virtual-scroll signal.
+  // Loaded articles are not treated as the full conversation.
+  getThreadExtent(doc) {
+    const root = this.getObserverRoot(doc);
+    return {
+      loadedCount: this.messagesIn(root).length,
+      expectedCount: null,
+      complete: false,
+      reason: "no-confirmed-total"
+    };
   }
 };

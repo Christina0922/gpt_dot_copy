@@ -1,7 +1,7 @@
 # Dot Copy Paste
 
 작업명: Dot Copy Paste  
-버전: 0.2.3  
+버전: 0.2.4  
 공개 제품명과 상표 검토: 완료되지 않음
 
 이 확장프로그램은 OpenAI의 공식 제품이나 제휴 제품이 아닙니다.
@@ -14,7 +14,7 @@
 
 - 프로젝트: `D:\1000_b_project\gpt_dot_copy`
 - 압축해제 설치 폴더: `D:\1000_b_project\gpt_dot_copy\extension`
-- 웹스토어 업데이트 ZIP: `D:\1000_b_project\gpt_dot_copy\dist\Dot-Copy-Paste-0.2.3.zip`
+- 웹스토어 업데이트 ZIP: `D:\1000_b_project\gpt_dot_copy\dist\Dot-Copy-Paste-0.2.4.zip`
 
 처음 파일은 `D:\1000_b_project\Dot_Copy_Paste`에 작성한 뒤 이 폴더로 통합했습니다. 그 원본 폴더는 삭제하지 않았습니다.
 
@@ -35,7 +35,7 @@ scripts\package.cmd
 2. 개발자 모드를 켭니다.
 3. 압축해제된 확장 프로그램을 로드합니다.
 4. `D:\1000_b_project\gpt_dot_copy\extension` 폴더를 선택합니다.
-5. 도구 모음에서 Dot Copy Paste 팝업을 열어 버전 0.2.3을 확인합니다. 클립보드 허용·철회 메뉴는 없습니다.
+5. 도구 모음에서 Dot Copy Paste 팝업을 열어 버전 0.2.4를 확인합니다. 구매 버튼은 ‘판매 준비 중’이며 결제 페이지로 이동하지 않습니다.
 
 이미 `D:\1000_b_project\Dot_Copy_Paste\extension`을 Chrome에 불러왔다면 그 항목을 제거하고 위 새 폴더를 다시 불러와야 합니다. 확장프로그램 ID와 클립보드 선택 권한이 그대로 유지된다고 보지 않습니다.
 
@@ -69,7 +69,9 @@ scripts\package.cmd
 - 대상은 Chrome의 닷 웹 화면으로 한정합니다.
 - ChatGPT 데스크톱 앱과 모바일 앱은 지원하지 않습니다.
 - 모바일 웹은 OpenAI 문서에서도 지원되지 않는다고 되어 있으며, 이 확장프로그램도 지원하지 않습니다.
-- 대화 전체 내보내기, 요약, 클립보드 기록, 계정, 결제, 서버, 분석 기능은 없습니다.
+- 복사와 붙여넣기 안내는 무료입니다. 대화 내보내기는 별도 일회성 기능으로 만들어 두었지만, 이 빌드는 파일을 저장하지 않습니다. 전체 대화를 확인하지 못했고 결제 서버가 연결되지 않아 구매 버튼은 ‘판매 준비 중’입니다.
+- 내보내기 코드는 열려 있는 닷 화면의 불러온 메시지를 TXT 또는 Markdown으로 만듭니다. 전체 개수가 확인되지 않으면 파일 첫줄은 ‘현재 불러온 메시지 내보내기’입니다. 첨부파일 원본은 넣지 않습니다. 대화 본문은 결제 서버로 보내지 않습니다.
+- 월 구독과 자동 갱신은 없습니다. 가격으로 잡아 둔 금액은 일회성 4,900원이며, 판매자는 Google이 아니라 개발자입니다. 이후 기능이 모두 포함된다고 약속하지 않습니다.
 - 닷 입력창에는 붙여넣기 버튼으로 글을 넣지 않습니다. 글자가 보이거나 Send가 이미 켜져 있어도 초안 반영을 확인하지 못하기 때문입니다. 버튼은 비활성이고, 입력창을 누른 뒤 Ctrl+V를 쓰라고 안내합니다. 선택 영역 복원과 실행 취소는 보장하지 않습니다. 기존 문단과 줄바꿈은 바꾸지 않습니다.
 
 ## 알려진 제한
@@ -83,7 +85,7 @@ scripts\package.cmd
 
 | 선언 | 종류 | 이유 |
 | --- | --- | --- |
-| `storage` | 필수 | 기능 켜기/끄기와 언어만 이 브라우저에 저장합니다. |
+| `storage` | 필수 | 기능 켜기/끄기와 언어를 이 브라우저에 저장합니다. 구매 세션 토큰을 저장할 자리는 있지만, 이 빌드는 토큰을 받지 않으며 `pro` 값으로 내보내기를 열지 않습니다. |
 | `https://chatgpt.com/*` | 콘텐츠 스크립트 범위 | 버튼을 넣을 수 있는 사이트를 chatgpt.com으로 제한합니다. 설치 시 해당 사이트 데이터 접근 경고가 표시될 수 있습니다. |
 
 `clipboardWrite`, `tabs`, `history`, `cookies`, `webRequest`, `scripting`, `activeTab`, `<all_urls>`는 선언하지 않습니다. `host_permissions`, `optional_host_permissions`, 서비스 워커, `web_accessible_resources`도 없습니다. 콘텐츠 스크립트는 최상위 프레임에만 들어갑니다.
@@ -104,3 +106,5 @@ scripts\package.cmd
 - [STORE_LISTING_KO.md](STORE_LISTING_KO.md)
 - [CHANGELOG.md](CHANGELOG.md)
 - [STORE_LISTING_EN.md](STORE_LISTING_EN.md)
+- [PAYMENTS.md](PAYMENTS.md)
+- [TERMS.md](TERMS.md)

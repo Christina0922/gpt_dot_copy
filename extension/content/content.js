@@ -65,7 +65,28 @@ const MESSAGES = {
     unofficial: "Independently developed extension. Not an official OpenAI product.",
     versionLabel: "Version",
     domUnverified: "Copy and paste buttons appear only on a ChatGPT dot conversation page.",
-    trademark: "The public product name and trademark review are not finished. Dot Copy Paste is the working name."
+    trademark: "The public product name and trademark review are not finished. Dot Copy Paste is the working name.",
+    exportHeading: "Export conversation",
+    exportLimit: "Only messages loaded on screen can be saved. A file is not called the full conversation unless the full thread is confirmed. This is not for sale yet.",
+    exportFormat: "Format",
+    exportTxt: "TXT",
+    exportMarkdown: "Markdown",
+    exportAction: "Export conversation",
+    proPrice: "Buy Pro — one-time KRW 4,900. There is no monthly subscription and no automatic renewal. Later features are not included.",
+    salePreparing: "Sale in preparation",
+    buyPro: "Buy Pro — one-time KRW 4,900",
+    restorePurchase: "Restore purchase",
+    checkPurchase: "Check purchase status",
+    purchaseActive: "Conversation export is confirmed for this account.",
+    purchaseNone: "No purchase was confirmed for this account.",
+    purchaseRefunded: "A refund or payment cancellation removed export access.",
+    purchaseUnavailable: "The purchase status could not be checked. The purchase was not cancelled.",
+    purchaseSeller: "The seller is the extension developer, not Google. Copy and paste stay free.",
+    notDotPage: "Export runs only on a ChatGPT dot conversation.",
+    exportedLoaded: "Saved the messages loaded on screen. This file is not a confirmed full conversation.",
+    exportedFull: "Saved the confirmed full conversation.",
+    noPage: "The open dot conversation could not be reached.",
+    badFormat: "Choose TXT or Markdown."
   },
   ko: {
     copyBusy: "답변이 끝난 뒤 복사할 수 있습니다",
@@ -93,7 +114,28 @@ const MESSAGES = {
     unofficial: "독립적으로 개발된 확장프로그램입니다. OpenAI의 공식 제품이 아닙니다.",
     versionLabel: "버전",
     domUnverified: "복사·붙여넣기 버튼은 ChatGPT 닷 대화 화면에만 나타납니다.",
-    trademark: "공개 제품명과 상표 검토는 끝나지 않았습니다. Dot Copy Paste는 작업명입니다."
+    trademark: "공개 제품명과 상표 검토는 끝나지 않았습니다. Dot Copy Paste는 작업명입니다.",
+    exportHeading: "대화 내보내기",
+    exportLimit: "화면에 불러온 메시지만 저장할 수 있습니다. 전체 대화로 확인되기 전에는 전체 내보내기라고 저장하지 않습니다. 이 기능은 아직 판매하지 않습니다.",
+    exportFormat: "형식",
+    exportTxt: "TXT",
+    exportMarkdown: "Markdown",
+    exportAction: "대화 내보내기",
+    proPrice: "Pro 구매 — 일회성 4,900원. 월 구독과 자동 갱신은 없습니다. 이후에 나올 기능까지 포함하지는 않습니다.",
+    salePreparing: "판매 준비 중",
+    buyPro: "Pro 구매 — 일회성 4,900원",
+    restorePurchase: "구매 복원",
+    checkPurchase: "구매 상태 확인",
+    purchaseActive: "이 계정의 대화 내보내기가 확인되었습니다.",
+    purchaseNone: "이 계정에서 확인된 구매가 없습니다.",
+    purchaseRefunded: "환불 또는 결제 취소로 내보내기 권한이 없습니다.",
+    purchaseUnavailable: "구매 상태를 확인하지 못했습니다. 구매가 취소된 것은 아닙니다.",
+    purchaseSeller: "판매자는 Google이 아니라 이 확장프로그램의 개발자입니다. 복사와 붙여넣기는 무료입니다.",
+    notDotPage: "닷 대화 화면에서만 내보낼 수 있습니다.",
+    exportedLoaded: "현재 불러온 메시지를 저장했습니다. 전체 대화로 확인된 파일은 아닙니다.",
+    exportedFull: "확인된 전체 대화를 저장했습니다.",
+    noPage: "열려 있는 닷 대화에 연결하지 못했습니다.",
+    badFormat: "TXT 또는 Markdown을 선택해 주세요."
   }
 };
 
@@ -1073,10 +1115,314 @@ const liveAdapter = {
     const send = findSendButton(element?.closest?.("[data-role='composer']"));
     if (!send) return null;
     return send.disabled !== true && send.getAttribute("aria-disabled") !== "true";
+  },
+  // The signed-in dot page did not show a total message count or a completed virtual-scroll signal.
+  // Loaded articles are not treated as the full conversation.
+  getThreadExtent(doc) {
+    const root = this.getObserverRoot(doc);
+    return {
+      loadedCount: this.messagesIn(root).length,
+      expectedCount: null,
+      complete: false,
+      reason: "no-confirmed-total"
+    };
   }
 };
 
 return { detectDotScreen, findSendButton, liveAdapter };
+})();
+
+const { PRODUCT_ID, SALE, purchasePresentation } = (() => {
+// Shipped sale state. Full-thread export is not confirmed on the live dot page,
+// so this build does not open checkout or call a payment provider.
+const PRODUCT_ID = "dot-copy-paste-export";
+
+const SALE = Object.freeze({
+  open: false,
+  fullExportVerified: false,
+  provider: "paddle",
+  apiBase: "",
+  productId: PRODUCT_ID,
+  amount: 4900,
+  currency: "KRW",
+  interval: "one-time"
+});
+
+function purchasePresentation(sale = SALE) {
+  const ready = sale?.open === true && sale.fullExportVerified === true && typeof sale.apiBase === "string" && sale.apiBase !== "";
+  if (!ready) return { state: "preparing", labelKey: "salePreparing", disabled: true };
+  return { state: "open", labelKey: "buyPro", disabled: false };
+}
+
+return { PRODUCT_ID, SALE, purchasePresentation };
+})();
+
+const { readEntitlement, entitlementFromServer, mayExport, statusMessageKey } = (() => {
+
+async function readEntitlement({ storage, sale = SALE, request } = {}) {
+  const stored = await readStorage(storage);
+  if (!sale || sale.open !== true || sale.fullExportVerified !== true || !sale.apiBase) {
+    return { entitled: false, state: "sale-closed", source: "local-config" };
+  }
+  if (typeof request !== "function") {
+    return { entitled: false, state: "unavailable", source: "local-config" };
+  }
+  const token = typeof stored?.licenseSession?.token === "string" ? stored.licenseSession.token : "";
+  let response;
+  try {
+    response = await request({ token });
+  } catch {
+    return { entitled: false, state: "unavailable", source: "server" };
+  }
+  return entitlementFromServer(response);
+}
+
+function entitlementFromServer(body) {
+  if (!body || typeof body !== "object" || body.source !== "server") {
+    return { entitled: false, state: "unavailable", source: "server" };
+  }
+  if (body.state === "unavailable") {
+    return { entitled: false, state: "unavailable", source: "server" };
+  }
+  const matches = body.entitled === true
+    && body.state === "entitled"
+    && body.productId === PRODUCT_ID
+    && body.amount === 4900
+    && body.currency === "KRW";
+  if (matches) return { entitled: true, state: "entitled", source: "server" };
+  if (body.state === "refunded") return { entitled: false, state: "refunded", source: "server" };
+  return { entitled: false, state: "not-purchased", source: "server" };
+}
+
+function mayExport(entitlement) {
+  return entitlement?.entitled === true && entitlement.state === "entitled" && entitlement.source === "server";
+}
+
+function statusMessageKey(entitlement) {
+  switch (entitlement?.state) {
+    case "entitled":
+      return "purchaseActive";
+    case "not-purchased":
+      return "purchaseNone";
+    case "refunded":
+      return "purchaseRefunded";
+    case "sale-closed":
+      return "salePreparing";
+    default:
+      return "purchaseUnavailable";
+  }
+}
+
+async function readStorage(storage) {
+  if (!storage || typeof storage.get !== "function") return {};
+  const stored = await storage.get(["licenseSession", "pro", "settings"]);
+  return stored && typeof stored === "object" ? stored : {};
+}
+
+return { readEntitlement, entitlementFromServer, mayExport, statusMessageKey };
+})();
+
+const { readConfirmedTime, readConversationTitle, sanitizeTitle, formatExportDate, exportFilename, exportScope, collectMessages, buildConversationExport } = (() => {
+
+const COPY = {
+  ko: {
+    loaded: "현재 불러온 메시지 내보내기",
+    full: "대화 전체 내보내기",
+    loadedNote: "이 파일은 화면에 불러온 메시지입니다. 전체 대화인지는 확인되지 않았습니다.",
+    missingTotal: "불러온 메시지 수와 전체 메시지 수가 일치하는지는 확인하지 못했습니다.",
+    unfinished: "완료로 확인되지 않은 답변이 있어 전체 대화로 저장하지 않았습니다.",
+    title: "제목",
+    noTitle: "확인된 제목 없음",
+    date: "내보낸 날짜(UTC)",
+    attachment: "첨부파일 원본은 포함하지 않습니다.",
+    user: "사용자",
+    dot: "닷",
+    unknown: "작성자 미확인",
+    generating: "아직 완료되지 않은 답변입니다.",
+    unknownState: "이 답변의 완료 여부는 확인되지 않았습니다.",
+    time: "시간"
+  },
+  en: {
+    loaded: "Export of messages loaded on screen",
+    full: "Full conversation export",
+    loadedNote: "This file contains the messages loaded on screen. It is not confirmed to be the full conversation.",
+    missingTotal: "The loaded message count was not confirmed against the full message count.",
+    unfinished: "A reply is not confirmed finished, so this file is not a full conversation export.",
+    title: "Title",
+    noTitle: "No confirmed title",
+    date: "Exported date (UTC)",
+    attachment: "Original attachments are not included.",
+    user: "User",
+    dot: "Dot",
+    unknown: "Author not confirmed",
+    generating: "This reply is not finished.",
+    unknownState: "Whether this reply is finished was not confirmed.",
+    time: "Time"
+  }
+};
+
+function readConfirmedTime(message) {
+  const node = message?.querySelector?.("time");
+  if (!node) return "";
+  const datetime = (node.getAttribute("datetime") || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}(?:[T\s].*)?$/.test(datetime)) return datetime;
+  return (node.textContent || "").replace(/\s+/g, " ").trim();
+}
+
+function readConversationTitle(doc) {
+  const title = typeof doc?.title === "string" ? doc.title.trim() : "";
+  if (!title || /^chatgpt$/i.test(title)) return "";
+  return title;
+}
+
+function sanitizeTitle(title) {
+  return String(title || "")
+    .normalize("NFKC")
+    .replace(/[\u0000-\u001f]/g, "")
+    .replace(/[\\/:*?"<>|]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^\.+/, "")
+    .replace(/^[-.]+|[-.]+$/g, "")
+    .slice(0, 60);
+}
+
+function formatExportDate(date) {
+  const value = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(value.getTime())) return "";
+  return value.toISOString().slice(0, 10);
+}
+
+function exportFilename(title, exportedAt, format) {
+  const date = formatExportDate(exportedAt);
+  const cleaned = sanitizeTitle(title);
+  const base = cleaned || "dot-conversation";
+  const ext = format === "markdown" ? "md" : "txt";
+  return date ? `${base}-${date}.${ext}` : `${base}.${ext}`;
+}
+
+function exportScope(extent, messages) {
+  const list = Array.isArray(messages) ? messages : [];
+  const allComplete = list.length > 0 && list.every((message) => message.state === "complete");
+  const countMatches = extent?.complete === true
+    && Number.isInteger(extent.expectedCount)
+    && extent.expectedCount === list.length
+    && extent.loadedCount === list.length;
+  if (allComplete && countMatches) return { scope: "full", reason: "confirmed" };
+  if (!allComplete) return { scope: "loaded", reason: "unfinished-or-unconfirmed" };
+  return { scope: "loaded", reason: extent?.reason || "no-confirmed-total" };
+}
+
+function collectMessages(adapter, doc) {
+  const detection = adapter?.detect?.(doc);
+  if (!detection?.active) return { ok: false, code: "not-dot-screen", messages: [] };
+  const root = adapter.getObserverRoot(doc);
+  const nodes = adapter.messagesIn(root);
+  const messages = nodes.map((node) => {
+    const body = adapter.getBodyElement(node);
+    return {
+      author: adapter.getAuthor(node) || "unknown",
+      state: adapter.getGenerationState(node) || "unknown",
+      time: readConfirmedTime(node),
+      text: body ? extractPlainText(body) : "",
+      markdown: body ? extractMarkdown(body) : "",
+      attachmentOmitted: hasAttachment(node)
+    };
+  });
+  const extent = typeof adapter.getThreadExtent === "function"
+    ? adapter.getThreadExtent(doc)
+    : { complete: false, loadedCount: messages.length, expectedCount: null, reason: "no-confirmed-total" };
+  return { ok: true, messages, extent, title: readConversationTitle(doc) };
+}
+
+function buildConversationExport({ messages, title, exportedAt, language, format, scope, reason }) {
+  const copy = COPY[language === "ko" ? "ko" : "en"];
+  const lines = [scope === "full" ? copy.full : copy.loaded];
+  if (scope !== "full") {
+    lines.push(copy.loadedNote);
+    lines.push(reason === "unfinished-or-unconfirmed" ? copy.unfinished : copy.missingTotal);
+  }
+  lines.push(`${copy.title}: ${title ? title : copy.noTitle}`);
+  const date = formatExportDate(exportedAt);
+  if (date) lines.push(`${copy.date}: ${date}`);
+  if (messages.some((message) => message.attachmentOmitted)) lines.push(copy.attachment);
+  lines.push("");
+  messages.forEach((message, index) => {
+    const author = copy[message.author] || copy.unknown;
+    lines.push(format === "markdown" ? `## ${index + 1}. ${author}` : `${index + 1}. ${author}`);
+    if (message.state === "generating") lines.push(copy.generating);
+    else if (message.state !== "complete") lines.push(copy.unknownState);
+    if (message.time) lines.push(`${copy.time}: ${message.time}`);
+    lines.push("");
+    lines.push(format === "markdown" ? message.markdown : message.text);
+    lines.push("");
+  });
+  return {
+    filename: exportFilename(title, exportedAt, format === "markdown" ? "markdown" : "txt"),
+    text: `${lines.join("\n").replace(/\n+$/g, "\n")}`,
+    mime: format === "markdown" ? "text/markdown" : "text/plain"
+  };
+}
+
+function hasAttachment(node) {
+  if (!node || typeof node.querySelector !== "function") return false;
+  return Boolean(node.querySelector("img, video, audio, a[download]"));
+}
+
+return { readConfirmedTime, readConversationTitle, sanitizeTitle, formatExportDate, exportFilename, exportScope, collectMessages, buildConversationExport };
+})();
+
+const { handleExportRequest, saveTextFile } = (() => {
+
+async function handleExportRequest({
+  doc,
+  adapter,
+  format,
+  language,
+  exportedAt = new Date(),
+  storage,
+  sale = SALE,
+  request,
+  saveFile
+} = {}) {
+  const entitlement = await readEntitlement({ storage, sale, request });
+  if (!mayExport(entitlement)) {
+    return { ok: false, code: entitlement.state || "not-purchased" };
+  }
+  if (format !== "txt" && format !== "markdown") return { ok: false, code: "bad-format" };
+  const collected = collectMessages(adapter, doc);
+  if (!collected.ok) return { ok: false, code: collected.code };
+  const scope = exportScope(collected.extent, collected.messages);
+  const file = buildConversationExport({
+    messages: collected.messages,
+    title: collected.title,
+    exportedAt,
+    language,
+    format,
+    scope: scope.scope,
+    reason: scope.reason
+  });
+  if (typeof saveFile === "function") saveFile({ filename: file.filename, text: file.text, mime: file.mime });
+  return { ok: true, code: scope.scope === "full" ? "exported-full" : "exported-loaded", count: collected.messages.length };
+}
+
+function saveTextFile(doc, file) {
+  const view = doc?.defaultView;
+  if (!view || typeof view.URL?.createObjectURL !== "function" || !file) return false;
+  const blob = new view.Blob([file.text], { type: `${file.mime};charset=utf-8` });
+  const url = view.URL.createObjectURL(blob);
+  const link = doc.createElement("a");
+  link.href = url;
+  link.download = file.filename;
+  link.hidden = true;
+  doc.body.append(link);
+  link.click();
+  link.remove();
+  view.setTimeout(() => view.URL.revokeObjectURL(url), 0);
+  return true;
+}
+
+return { handleExportRequest, saveTextFile };
 })();
 
 const { createController } = (() => {
@@ -1866,6 +2212,23 @@ function startApp({
     }, delay));
   }
 
+  chrome.runtime?.onMessage?.addListener((message, _sender, sendResponse) => {
+    if (!message || message.type !== "dcp-export") return;
+    handleExportRequest({
+      doc,
+      adapter,
+      format: message.format,
+      language: resolveLanguage(settings.language, uiLanguage()),
+      storage: chrome.storage?.local,
+      saveFile: (file) => saveTextFile(doc, file)
+    }).then((result) => {
+      sendResponse({ ok: result.ok === true, code: result.code, count: result.count || 0 });
+    }).catch(() => {
+      sendResponse({ ok: false, code: "unavailable" });
+    });
+    return true;
+  });
+
   chrome.storage?.onChanged.addListener((changes, area) => {
     if (area !== "local" || !changes.settings) return;
     restart("settings");
@@ -1890,7 +2253,7 @@ startApp({
   chrome,
   window,
   document,
-  build: "725d4aa0afd9"
+  build: "0b6799485754"
 }).catch((error) => {
   const name = error && typeof error.name === "string" ? error.name : "Error";
   console.error("[Dot Copy Paste]", name);

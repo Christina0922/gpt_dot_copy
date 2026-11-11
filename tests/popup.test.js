@@ -49,17 +49,38 @@ function fakeChrome() {
   };
 }
 
-test("popup has no clipboard permission menu and does not request clipboardRead", async () => {
+test("popup has no clipboard permission menu and does not start a payment", async () => {
   const doc = popupDom();
   const chrome = fakeChrome();
-  const popup = wirePopup(doc, { chrome, version: "0.2.3" });
+  let asked = 0;
+  const popup = wirePopup(doc, {
+    chrome,
+    version: "0.2.4",
+    askPage() {
+      asked += 1;
+      return { ok: true, code: "exported-full" };
+    },
+    licenseRequest() {
+      throw new Error("network");
+    }
+  });
   await popup.init();
   assert.equal(doc.querySelector("[data-action='allow-clipboard']"), null);
   assert.equal(doc.querySelector("[data-action='revoke-clipboard']"), null);
   assert.equal(doc.querySelector("[data-i18n='clipboardExplain']"), null);
+  assert.equal(doc.querySelector("input[type='email']"), null);
   assert.equal(chrome.calls.includes("request"), false);
   assert.equal(chrome.calls.includes("remove"), false);
   assert.equal(doc.querySelector("[data-i18n='domUnverified']").textContent, "Copy and paste buttons appear only on a ChatGPT dot conversation page.");
-  assert.equal(doc.querySelector("[data-role='version']").textContent, "0.2.3");
+  assert.equal(doc.querySelector("[data-role='version']").textContent, "0.2.4");
+  assert.equal(doc.querySelector("[data-action='buy-pro']").disabled, true);
+  assert.equal(doc.querySelector("[data-action='buy-pro']").textContent, "Sale in preparation");
+  assert.equal(doc.querySelector("[data-i18n='proPrice']").textContent, "Buy Pro — one-time KRW 4,900. There is no monthly subscription and no automatic renewal. Later features are not included.");
+  assert.equal(doc.querySelector("[data-role='purchase-status']").textContent, "Sale in preparation");
+  assert.equal(asked, 0);
+  doc.querySelector("[data-action='export']").click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(asked, 0);
+  assert.equal(doc.querySelector("[data-setting='enabled']").checked, true);
   assert.equal(chrome.storageState.settings.enabled, true);
 });

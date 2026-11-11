@@ -61,6 +61,13 @@ select {
   padding: 6px 8px;
 }
 
+.actions {
+  flex-wrap: wrap;
+}
+
+button:disabled {
+  opacity: 0.72;
+}
 button:focus,
 select:focus,
 input:focus {

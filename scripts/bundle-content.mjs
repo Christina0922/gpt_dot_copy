@@ -14,6 +14,10 @@ const order = [
   "src/clipboard.js",
   "src/icons.js",
   "src/live-adapter.js",
+  "src/sale.js",
+  "src/entitlement.js",
+  "src/export-conversation.js",
+  "src/export-action.js",
   "src/controller.js",
   "src/bootstrap.js"
 ];

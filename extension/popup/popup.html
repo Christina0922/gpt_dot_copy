@@ -22,6 +22,28 @@
           <option value="ko">Korean</option>
         </select>
       </label>
+      <section>
+        <h2 data-i18n="exportHeading"></h2>
+        <p class="notice" data-i18n="exportLimit"></p>
+        <label class="field">
+          <span data-i18n="exportFormat"></span>
+          <select data-setting="export-format">
+            <option value="txt" data-i18n="exportTxt"></option>
+            <option value="markdown" data-i18n="exportMarkdown"></option>
+          </select>
+        </label>
+        <div class="actions">
+          <button type="button" data-action="export" data-i18n="exportAction"></button>
+        </div>
+        <p class="notice" data-i18n="proPrice"></p>
+        <p class="meta" data-i18n="purchaseSeller"></p>
+        <div class="actions">
+          <button type="button" data-action="buy-pro"></button>
+          <button type="button" data-action="restore-purchase" data-i18n="restorePurchase"></button>
+          <button type="button" data-action="purchase-status" data-i18n="checkPurchase"></button>
+        </div>
+        <p class="status" data-role="purchase-status" role="status" aria-live="polite"></p>
+      </section>
       <p class="meta"><span data-i18n="versionLabel"></span> <span data-role="version"></span></p>
       <p class="meta" data-i18n="unofficial"></p>
       <p class="meta" data-i18n="trademark"></p>

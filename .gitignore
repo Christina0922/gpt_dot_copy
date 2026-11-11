@@ -1,7 +1,8 @@
 node_modules/
 dist/
 chrome-smoke-profile/
-*.log
+.env
+.env.*
 .DS_Store
 
 # Raw saved Dot pages contain real conversations; only sanitized fixtures belong in the repo.

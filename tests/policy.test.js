@@ -9,7 +9,7 @@ const root = new URL("../extension/", import.meta.url);
 test("manifest is MV3 and limited to chatgpt.com", () => {
   const manifest = JSON.parse(readFileSync(new URL("manifest.json", root), "utf8"));
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, "0.2.3");
+  assert.equal(manifest.version, "0.2.4");
   assert.deepEqual(manifest.permissions, ["storage"]);
   assert.equal(manifest.optional_permissions, undefined);
   assert.equal(JSON.stringify(manifest).includes("clipboardRead"), false);
@@ -42,7 +42,6 @@ test("locale descriptions stay within the Chrome limit and do not claim partners
 test("extension source does not send or render user text unsafely", () => {
   const files = [
     "content/content.js",
-    "popup/popup.js",
     "src/bootstrap.js",
     "src/clipboard.js",
     "src/controller.js",
@@ -50,12 +49,22 @@ test("extension source does not send or render user text unsafely", () => {
     "src/extract-markdown.js",
     "src/insert-text.js",
     "src/live-adapter.js",
+    "src/sale.js",
+    "src/entitlement.js",
+    "src/export-conversation.js",
+    "src/export-action.js",
     "src/popup-controller.js"
   ];
   const source = files.map((file) => readFileSync(new URL(file, root), "utf8")).join("\n");
-  for (const forbidden of ["innerHTML", "insertAdjacentHTML", "fetch(", "XMLHttpRequest", "WebSocket", "eval(", "chrome.tabs", "webRequest"]) {
+  for (const forbidden of ["innerHTML", "insertAdjacentHTML", "fetch(", "XMLHttpRequest", "WebSocket", "eval(", "chrome.tabs", "webRequest", "localhost", "127.0.0.1", "sk_live", "sk_test", "whsec_"]) {
     assert.equal(source.includes(forbidden), false, forbidden);
   }
+  const popup = readFileSync(new URL("popup/popup.js", root), "utf8");
+  assert.equal(popup.includes("fetch("), false);
+  assert.equal(popup.includes("localhost"), false);
+  assert.equal(popup.includes("chrome.tabs.query"), true);
+  assert.equal(popup.includes("chrome.tabs.sendMessage"), true);
+  assert.equal(JSON.stringify(JSON.parse(readFileSync(new URL("manifest.json", root), "utf8"))).includes("tabs"), false);
 });
 
 test("Korean clipboard denial text is exact", () => {

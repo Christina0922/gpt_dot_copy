@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.4
+
+- Added a local TXT or Markdown export of messages loaded on a dot conversation. It is not labeled as the full conversation, and it is not for sale, because the live page has no confirmed full-thread count.
+- Added a server-checked one-time purchase flow for tests. The extension does not open a payment page, and a local pro flag does not unlock export.
+
 ## 0.2.3
 
 - Removed `clipboardRead` and the popup allow/revoke controls. The dot paste button does not read the clipboard, and no other product feature does.

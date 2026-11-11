@@ -1,4 +1,5 @@
 import { createController } from "./controller.js";
+import { handleExportRequest, saveTextFile } from "./export-action.js";
 import { liveAdapter } from "./live-adapter.js";
 import { normalizeSettings, readStoredSettings } from "./settings.js";
 import { resolveLanguage } from "./i18n.js";
@@ -143,6 +144,23 @@ export function startApp({
       log("still-waiting", { reason: detection.reason, missing: detection.missing || [], waitedMs: delay, path: doc.location?.pathname || "" });
     }, delay));
   }
+
+  chrome.runtime?.onMessage?.addListener((message, _sender, sendResponse) => {
+    if (!message || message.type !== "dcp-export") return;
+    handleExportRequest({
+      doc,
+      adapter,
+      format: message.format,
+      language: resolveLanguage(settings.language, uiLanguage()),
+      storage: chrome.storage?.local,
+      saveFile: (file) => saveTextFile(doc, file)
+    }).then((result) => {
+      sendResponse({ ok: result.ok === true, code: result.code, count: result.count || 0 });
+    }).catch(() => {
+      sendResponse({ ok: false, code: "unavailable" });
+    });
+    return true;
+  });
 
   chrome.storage?.onChanged.addListener((changes, area) => {
     if (area !== "local" || !changes.settings) return;
